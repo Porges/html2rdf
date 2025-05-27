@@ -1,0 +1,23 @@
+[package]
+name = "html2rdf-cli"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+publish.workspace = true
+readme.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "html2rdf"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5.38", features = ["derive", "wrap_help"] }
+html2rdf = { path = "../html2rdf" }
+oxiri = "0.2.11"
+oxrdf = "0.2.4"
+oxttl = "0.1.8"
+reqwest = { version = "0.12.15", features = ["blocking"] }
+url = "2.5.4"

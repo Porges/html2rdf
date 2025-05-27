@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = [ "html2rdf" , "html2rdf-cli"]
+
+[workspace.package]
+authors = ["George Pollard <porges@porg.es>"]
+edition = "2024"
+keywords = ["html", "rdf", "rdfa"]
+license = "Apache-2.0"
+publish = false
+readme = "README.md"
+repository = "https://github.com/Porges/html2rdf"
