@@ -1,7 +1,11 @@
-use std::collections::HashSet;
+use std::{
+    collections::{HashMap, HashSet},
+    rc::{Rc, Weak},
+};
 
+use enum_ptr::Compact;
 use itertools::Itertools;
-use oxrdf::Graph;
+use oxrdf::{Graph, Literal};
 
 pub fn serialize_graph(graph: Graph, base: &str) -> String {
     // NB: we use rdf_canon here because the one provided by oxrdf hangs
@@ -82,4 +86,107 @@ pub fn assert_graph(html: &str, ttl: &str) {
     let ttl_output = serialize_graph(ttl_graph, base.as_str());
 
     pretty_assertions::assert_eq!(output, ttl_output);
+}
+
+#[derive(Hash, Eq, PartialEq)]
+enum CompactSubj {
+    NamedNode(Rc<str>),
+    BlankNode(Rc<str>),
+}
+
+enum CompactObj {
+    NamedNode(Rc<str>),
+    BlankNode(Weak<str>),
+    Literal(Box<Literal>),
+}
+
+pub fn fancy_ttl(graph: Graph) -> String {
+    {
+        let mut intern: HashSet<Rc<str>> = HashSet::new();
+        let mut interned = |s: &str| {
+            if let Some(rc_str) = intern.get(s) {
+                rc_str.clone()
+            } else {
+                let rc_str = Rc::<str>::from(s);
+                intern.insert(rc_str.clone());
+                rc_str
+            }
+        };
+
+        let groups = graph
+            .iter()
+            .map(|triple| {
+                let s = match triple.subject {
+                    oxrdf::SubjectRef::NamedNode(n) => CompactSubj::NamedNode(interned(n.as_str())),
+                    oxrdf::SubjectRef::BlankNode(b) => CompactSubj::BlankNode(interned(b.as_str())),
+                };
+
+                let p = interned(triple.predicate.as_str());
+
+                let o = match triple.object {
+                    oxrdf::TermRef::NamedNode(n) => CompactObj::NamedNode(interned(n.as_str())),
+                    oxrdf::TermRef::BlankNode(b) => {
+                        CompactObj::BlankNode(Rc::downgrade(&interned(b.as_str())))
+                    }
+                    oxrdf::TermRef::Literal(l) => CompactObj::Literal(Box::new(l.into())),
+                };
+
+                (s, (p, o))
+            })
+            .into_group_map();
+
+        drop(intern);
+
+        let mut output = String::new();
+        for (s, group) in &groups {
+            match s {
+                CompactSubj::NamedNode(n) => {
+                    output.push('<');
+                    output.push_str(n);
+                    output.push_str("> ");
+                }
+                CompactSubj::BlankNode(b) => {
+                    if Rc::weak_count(b) == 1 {
+                        continue; // someone else has/will render
+                    }
+
+                    if Rc::strong_count(b) == 1 {
+                        output.push_str("[] ");
+                    } else {
+                        output.push_str("_:");
+                        output.push_str(b);
+                        output.push(' ');
+                    }
+                }
+            }
+
+            for (p, o) in group {
+                output.push_str(&format!("    <{}> ", p));
+                match o {
+                    CompactObj::NamedNode(n) => {
+                        output.push('<');
+                        output.push_str(n);
+                        output.push_str("> ;")
+                    }
+                    CompactObj::BlankNode(b) => {
+                        if let Some(b) = b.upgrade() {
+                            if Rc::strong_count(&b) <= 2 {
+                                // render inline
+                                output.push_str("[ ... ] ;\n");
+                            } else {
+                                output.push('<');
+                                output.push_str(&b);
+                                output.push_str("> ;\n");
+                            }
+                        } else {
+                            // no other refs - it's empty
+                            output.push_str("[] ;")
+                        }
+                    }
+                    CompactObj::Literal(literal) => output.push_str(literal.value()),
+                }
+            }
+        }
+        output
+    }
 }
