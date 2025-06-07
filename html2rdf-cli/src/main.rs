@@ -6,6 +6,7 @@ use std::{
 };
 
 use clap::Parser;
+use indexmap::map::RawEntryApiV1;
 use itertools::Itertools;
 
 #[derive(Parser)]
@@ -217,4 +218,40 @@ enum Obj {
     NamedNode(Rc<str>),
     BlankNode(Weak<str>),
     Literal(Box<oxrdf::Literal>),
+}
+
+mod triplestore {
+    use std::{hash::Hash, marker::PhantomData};
+
+    type TripleStore<T> = iddqd::TriHashMap<T>;
+
+    struct Triple<S, P, O> {
+        subject: S,
+        predicate: P,
+        object: O,
+    }
+
+    pub struct BlankNodeContext {
+        next_id: usize,
+    }
+
+    impl BlankNodeContext {
+        fn new_anonymous(&mut self) -> BlankNode<'self> {
+            let id = self.next_id;
+            self.next_id += 1;
+        BlankNode {
+            id,
+            _context: PhantomData,
+        }
+    }
+    }
+
+    struct BlankNode<'a> {
+        id: usize,
+        _context: PhantomData<fn (&'a ()) -> &'a ()>,
+    }
+
+    pub fn can_index_map() {
+        let ts: TripleStore<Triple<String, String, String>> = TripleStore::new();
+    }
 }

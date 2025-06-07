@@ -16,6 +16,8 @@ path = "src/main.rs"
 [dependencies]
 clap = { version = "4.5.38", features = ["derive", "wrap_help"] }
 html2rdf = { path = "../html2rdf" }
+iddqd = "0.3.3"
+indexmap = "2.9.0"
 itertools = "0.14.0"
 oxiri = "0.2.11"
 oxrdf = "0.2.4"
