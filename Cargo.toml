@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "html2rdf" , "html2rdf-cli"]
+members = [ "compact_shacl", "html2rdf" , "html2rdf-cli"]
 
 [workspace.package]
 authors = ["George Pollard <porges@porg.es>"]

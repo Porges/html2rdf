@@ -1,0 +1,133 @@
+shaclDoc = _{
+    SOI ~ directive* ~ (nodeShape|shapeClass)* ~ EOI
+}
+
+directive   = _{ baseDecl | importsDecl | prefixDecl }
+baseDecl    = { KW_BASE ~ IRIREF }
+importsDecl = { KW_IMPORTS ~ IRIREF }
+prefixDecl  = { KW_PREFIX ~ PNAME_NS ~ IRIREF }
+
+nodeShape     = { KW_SHAPE ~ iri ~ targetClass? ~ nodeShapeBody }
+shapeClass    = { KW_SHAPE_CLASS ~ iri ~ nodeShapeBody }
+nodeShapeBody = { "{" ~ constraint* ~ "}" }
+targetClass   = { "->" ~ iri+ }
+
+constraint = _{ ( nodeOr+ | propertyShape ) ~ "." }
+nodeOr     = { nodeNot ~ ("|" ~ nodeNot)* }
+nodeNot    = { negation? ~ nodeValue }
+nodeValue  = { nodeParam ~ "=" ~ iriOrLiteralOrArray }
+
+propertyShape    = { path ~ ( propertyCount | propertyOr )* }
+propertyOr       = { propertyNot ~ ("|" ~ propertyNot)* }
+propertyNot      = { negation? ~ propertyAtom }
+propertyAtom     = { propertyType | nodeKind | shapeRef | propertyValue | nodeShapeBody }
+propertyCount    = { "[" ~ propertyMinCount ~ ".." ~ propertyMaxCount ~ "]" }
+propertyMinCount = { INTEGER }
+propertyMaxCount = { (INTEGER | "*") }
+propertyType     = _{ iri }
+nodeKind         = { "BlankNode" | "IRI" | "Literal" | "BlankNodeOrIRI" | "BlankNodeOrLiteral" | "IRIOrLiteral" }
+shapeRef         = { ATPNAME_LN | ATPNAME_NS | "@" ~ IRIREF }
+propertyValue    = { propertyParam ~ "=" ~ iriOrLiteralOrArray }
+negation         = { "!" }
+
+path             = { pathAlternative }
+pathAlternative  = { pathSequence ~ ("|" ~ pathSequence)* }
+pathSequence     = { pathEltOrInverse ~ ("/" ~ pathEltOrInverse)* }
+pathElt          = { pathPrimary ~ pathMod? }
+pathEltOrInverse = { pathElt | pathInverse ~ pathElt }
+pathInverse      = { "^" }
+pathMod          = { "?" | "*" | "+" }
+pathPrimary      = { iri | "(" ~ path ~ ")" }
+
+iriOrLiteralOrArray = { iriOrLiteral | array }
+iriOrLiteral        = { iri | literal }
+
+iri          = _{ IRIREF | prefixedName }
+prefixedName = @{ PNAME_LN | PNAME_NS }
+
+literal        = ${ rdfLiteral | numericLiteral | booleanLiteral }
+booleanLiteral = @{ "true" | "false" }
+numericLiteral = @{ INTEGER | DECIMAL | DOUBLE }
+rdfLiteral     = @{ string ~ (LANGTAG | "^^" ~ datatype)? }
+datatype       = @{ iri }
+string         = ${ STRING_LITERAL_LONG | STRING_LITERAL }
+
+array = { "[" ~ iriOrLiteral* ~ "]" }
+
+nodeParam = {
+    "targetNode" | "targetObjectsOf" | "targetSubjectsOf" |
+    "deactivated" | "severity" | "message" |
+    "class" | "datatype" | "nodeKind" |
+    "minExclusive" | "minInclusive" | "maxExclusive" | "maxInclusive" |
+    "minLength" | "maxLength" | "pattern" | "flags" | "languageIn" |
+    "equals" | "disjoint" |
+    "closed" | "ignoredProperties" | "hasValue" | "in"
+}
+
+propertyParam = {
+    "deactivated" | "severity" | "message" |
+    "class" | "datatype" | "nodeKind" |
+    "minExclusive" | "minInclusive" | "maxExclusive" | "maxInclusive" |
+    "minLength" | "maxLength" | "pattern" | "flags" | "languageIn" | "uniqueLang" |
+    "equals" | "disjoint" | "lessThan" | "lessThanOrEquals" |
+    "qualifiedValueShape" | "qualifiedMinCount" | "qualifiedMaxCount" | "qualifiedValueShapesDisjoint" |
+    "closed" | "ignoredProperties" | "hasValue" | "in"
+}
+
+// Keywords
+KW_BASE    = _{ "BASE" }
+KW_IMPORTS = _{ "IMPORTS" }
+KW_PREFIX  = _{ "PREFIX" }
+
+KW_SHAPE_CLASS = _{ "shapeClass" }
+KW_SHAPE       = _{ "shape" }
+
+IRIREF = _{
+    "<" ~ iri_value ~ ">"
+}
+
+iri_value =  @{
+    (
+        (!('\u{0000}'..'\u{0020}' | "="|"<"|">"|"\""|"{"|"}"|"|"|"^"|"`"|"\\") ~ ANY)
+        | UCHAR
+    )*
+}
+
+PNAME_NS   = _{ PN_PREFIX? ~ ":" }
+PNAME_LN   = { PNAME_NS ~ PN_LOCAL }
+ATPNAME_NS = { "@" ~ PN_PREFIX? ~ ":" }
+ATPNAME_LN = { "@" ~ PNAME_NS ~ PN_LOCAL }
+LANGTAG    = @{ "@" ~ ASCII_ALPHA+ ~ ("-" ~ ASCII_ALPHANUMERIC+)* }
+INTEGER    = @{ ("+"|"-")? ~ ASCII_DIGIT+ }
+DECIMAL    = @{ ("+"|"-")? ~ ASCII_DIGIT* ~ "." ~ ASCII_DIGIT+ }
+DOUBLE     = @{ ("+"|"-")? ~ (ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* ~ EXPONENT | "."? ~ ASCII_DIGIT+ ~ EXPONENT) }
+EXPONENT   = @{ ("e"|"E") ~ ("+"|"-")? ~ ASCII_DIGIT+ }
+STRING_LITERAL = ${ PUSH("'"|"\"") ~ string_inner ~ POP }
+string_inner = @{ (ECHAR | UCHAR | (!(PEEK|"\u{000A}"|"\u{000D}") ~ ANY))* }
+STRING_LITERAL_LONG = ${ PUSH("'"|"\"") ~ PUSH(PEEK) ~ PUSH(PEEK) ~ multiline_string_inner ~ POP_ALL }
+multiline_string_inner = @{ (ECHAR | UCHAR | (!PEEK_ALL ~ ANY))* }
+UCHAR = ${"\\u" ~ u4inner | "\\U" ~ u8inner }
+u4inner = @{ HEX{4} }
+u8inner = @{ HEX{8} }
+ECHAR = ${"\\" ~ einner }
+einner = @{ "t"|"b"|"n"|"r"|"f"|"\\"|"\""|"'" }
+PN_CHARS_BASE = @{
+   'A'..'Z' | 'a'..'z' | '\u{00C0}'..'\u{00D6}' | '\u{00D8}'..'\u{00F6}' | '\u{00F8}'..'\u{02FF}' | '\u{0370}'..'\u{037D}'
+   | '\u{037F}'..'\u{1FFF}' | '\u{200C}'..'\u{200D}' | '\u{2070}'..'\u{218F}' | '\u{2C00}'..'\u{2FEF}' | '\u{3001}'..'\u{D7FF}'
+   | '\u{F900}'..'\u{FDCF}' | '\u{FDF0}'..'\u{FFFD}' }
+PN_CHARS_U = @{ PN_CHARS_BASE | "_" }
+PN_CHARS = @{ PN_CHARS_U | "-" | ASCII_DIGIT | "\u{00B7}" | '\u{0300}'..'\u{036F}' | '\u{203F}'..'\u{2040}' }
+// todo - pn_prefix must not end in a dot
+PN_PREFIX = @{ PN_CHARS_BASE ~ PN_CHARS* }
+// todo pn_local must not end in a dot
+PN_LOCAL = @{ (PN_CHARS_U | ":" | ASCII_DIGIT | PLX) ~ (PN_CHARS | ":" | PLX)* }
+PLX     = @{ PERCENT | PN_LOCAL_ESC }
+PERCENT = @{ "%" ~ HEX ~ HEX }
+HEX     = @{ ASCII_DIGIT | 'A'..'F' | 'a'..'f' }
+PN_LOCAL_ESC = @{
+    "\\" ~ ("_" | "~" | "." | "-" | "!" | "$" | "&" | "'" | "(" | ")" | "*" | "+" | ","
+   | ";" | "=" | "/" | "?" | "#" | "@" | "%")
+}
+
+WHITESPACE = _{ "\u{0020}" | "\u{0009}" | "\u{000D}" | "\u{000A}" }
+COMMENT = _{ "#" ~ (!( "\r" | "\n" ) ~ ANY)* }
