@@ -1,13 +1,12 @@
 {
-    "workbench.colorCustomizations": {
-        "activityBar.background": "#12332C",
-        "titleBar.activeBackground": "#19473D",
-        "titleBar.activeForeground": "#F4FBFA"
-    },
     "cSpell.words": [
+        "bnode",
+        "Itertools",
         "Miette",
+        "oxiri",
+        "oxrdf",
         "RDFA",
         "RDFS",
-        "SHACL",
+        "SHACL"
     ]
 }
