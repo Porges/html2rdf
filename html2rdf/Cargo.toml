@@ -15,8 +15,8 @@ derive_more = { version = "2.0.1", features = ["display", "error", "from", "from
 icu = { version = "2.0.0-beta2" }
 indexmap = "2.9.0"
 itertools = "0.14.0"
-oxiri = "0.2.11"
-oxrdf = "0.2.4"
+oxiri = { workspace = true }
+oxrdf = { workspace = true }
 oxsdatatypes = "0.2.2"
 rdf-canon = "0.15.1"
 rxml_validation = "0.11.0"
@@ -25,7 +25,7 @@ vec1 = "1.12.1"
 
 [dev-dependencies]
 insta = { version = "1.43.1", features = ["glob"] }
-oxttl = "0.1.8"
+oxttl = { workspace = true }
 pretty_assertions = "1.4.1"
 rstest = { version = "0.25.0", default-features = false, features = ["crate-name"] }
 sha2 = "0.10.9"

@@ -15,9 +15,9 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.5.38", features = ["derive", "wrap_help"] }
-html2rdf = { path = "../html2rdf" }
-oxiri = "0.2.11"
-oxrdf = "0.2.4"
-oxttl = "0.1.8"
+html2rdf = { workspace = true }
+oxiri = { workspace = true }
+oxrdf = { workspace = true }
+oxttl = { workspace = true }
 reqwest = { version = "0.12.15", features = ["blocking"] }
 url = "2.5.4"
