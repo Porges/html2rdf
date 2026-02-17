@@ -110,16 +110,15 @@ pub fn parse(
 
         let base_sel = scraper::selector::Selector::parse("html>head>base").unwrap();
 
-        if let Some(base_el) = doc.select(&base_sel).next() {
-            if let Some(base_href) = base_el.attr("href") {
-                base =
-                    Iri::parse(base_href.to_string()).map_err(|source| Error::IriParseError {
-                        source,
-                        iri: base_href.to_string(),
-                    })?;
+        if let Some(base_el) = doc.select(&base_sel).next()
+            && let Some(base_href) = base_el.attr("href")
+        {
+            base = Iri::parse(base_href.to_string()).map_err(|source| Error::IriParseError {
+                source,
+                iri: base_href.to_string(),
+            })?;
 
-                trace!("<base> found: {base}");
-            }
+            trace!("<base> found: {base}");
         }
 
         let eval_context = EvaluationContext::new(base);
@@ -174,9 +173,7 @@ impl ListMapping {
     pub fn except_for(&self, other: &ListMapping) -> Self {
         let mut lists = self.lists.clone();
         lists.retain(|key, _| !other.lists.contains_key(key));
-        Self {
-            lists: lists.into(),
-        }
+        Self { lists }
     }
 }
 
@@ -282,7 +279,7 @@ impl<'b> LocalScope<'b> {
         }
     }
 
-    fn empty_curie(&self) -> oxrdf::NamedNodeRef {
+    fn empty_curie(&self) -> oxrdf::NamedNodeRef<'_> {
         oxrdf::NamedNodeRef::new_unchecked(self.eval_context.base.as_str())
     }
 
@@ -779,7 +776,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                     //  instantiated on the current element, use the list as follows:
                 }
                 S::OutputList(subject, list_mapping) => {
-                    if let Some(list_mapping) = Rc::try_unwrap(list_mapping).ok() {
+                    if let Ok(list_mapping) = Rc::try_unwrap(list_mapping) {
                         // 14. (cont)
                         for (iri, list) in list_mapping.into_inner().lists.iter() {
                             // “If there are zero items in the list associated with the IRI, generate the following triple:
@@ -834,11 +831,11 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             trace!(
                 "{}{}{} {attrs}",
                 ancestor_stack.join(">"),
-                ancestor_stack
-                    .is_empty()
-                    .not()
-                    .then_some(">")
-                    .unwrap_or_default(),
+                if ancestor_stack.is_empty().not() {
+                    ">"
+                } else {
+                    Default::default()
+                },
                 el.name()
             );
         }
@@ -955,7 +952,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             }
         }
 
-        let handle_safecurie_or_curie_or_iri_s =
+        let _handle_safecurie_or_curie_or_iri_s =
             |value: Option<&str>| -> Option<Vec<NamedOrBlankNode>> {
                 Some(local.safecuri_or_curie_or_iri_s(value?))
             };
@@ -1084,7 +1081,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             .or_else(|| src.map(NamedOrBlankNode::from))
             .map(|x| Rc::new(oxrdf::Subject::from(x)));
 
-        let new_subject: Rc<oxrdf::Subject>;
+        let _new_subject: Rc<oxrdf::Subject>;
 
         //5.
         // “If the current element contains no @rel or @rev attribute,
@@ -1112,12 +1109,9 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                     local.new_subject = Some(Rc::new(local.empty_curie().into()));
                 }
                 // “otherwise, if parent object is present, new subject is set to the value of parent object.
-                else if eval_context.parent_object.is_some() {
-                    trace!(
-                        "- Using parent object as new subject: {}",
-                        eval_context.parent_object.as_ref().unwrap()
-                    );
-                    local.new_subject = eval_context.parent_object.clone();
+                else if let Some(parent_obj) = &eval_context.parent_object {
+                    trace!("- Using parent object as new subject: {}", parent_obj);
+                    local.new_subject = Some(parent_obj.clone());
                 }
 
                 // “If @typeof is present then typed resource is set to the resource obtained from
@@ -1282,7 +1276,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                 // “by using the resource from @resource, if present, obtained according to the section on CURIE and IRI Processing;
                 //  otherwise, by using the IRI from @href, if present, obtained according to the section on CURIE and IRI Processing;
                 //  otherwise, by using the IRI from @src, if present, obtained according to the section on CURIE and IRI Processing;
-                local.current_object_resource = Some(Rc::new(resource_iri.clone().into()));
+                local.current_object_resource = Some(Rc::new(resource_iri.clone()));
                 trace!(
                     "- Using @resource/@href/@src as current object resource: {}",
                     local.current_object_resource.as_ref().unwrap()
@@ -1335,12 +1329,12 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         // 8.
         // “If in any of the previous steps a new subject
         //  was set to a non-null value different from the parent object;
-        if let Some(ns) = &local.new_subject {
-            if Some(ns) != eval_context.parent_object.as_ref() {
-                // “The list mapping taken from the evaluation context is set to a new, empty mapping.
-                trace!("- Setting new list mapping");
-                local.list_mappings = Default::default();
-            }
+        if let Some(ns) = &local.new_subject
+            && Some(ns) != eval_context.parent_object.as_ref()
+        {
+            // “The list mapping taken from the evaluation context is set to a new, empty mapping.
+            trace!("- Setting new list mapping");
+            local.list_mappings = Default::default();
         }
 
         // 9.
@@ -1539,7 +1533,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                             oxrdf::LiteralRef::new_typed_literal(&content_val, datatype).into()
                         }
                     }
-                    Some(NamedOrBlankNode::BlankNode(blank_node)) => todo!(),
+                    Some(NamedOrBlankNode::BlankNode(_blank_node)) => todo!(),
                 }
             } else if let Some(otherwise_datatype) = otherwise_datatype {
                 // [html-rdfa] extension #9
@@ -1614,47 +1608,47 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         // 12.
         // “If the skip element flag is 'false', and new subject was set to a non-null value,
         //  then any incomplete triples within the current context should be completed:
-        if !local.skip_element {
-            if let Some(new_subject) = &local.new_subject {
-                // “The list of incomplete triples from the current evaluation context
-                //  (not the local list of incomplete triples) will contain zero or more predicate
-                //  IRIs. This list is iterated over and each of the predicates is used with parent
-                //  subject and new subject to generate a triple or add a new element to the local
-                //  list mapping. Note that at each level there are two lists of incomplete triples;
-                //  one for the current processing level (which is passed to each child element in
-                //  the previous step), and one that was received as part of the evaluation context.
-                //  It is the latter that is used in processing during this step.
-                for incomplete in eval_context.incomplete_triples.iter() {
-                    // “Note that each incomplete triple has a direction value that is used to determine
-                    //  what will become the subject, and what will become the object, of each generated triple:
-                    match incomplete {
-                        // “If direction is 'none',
-                        //  the new subject is added to the list from the iterated incomplete triple.
-                        IncompleteTriple::List(name, list) => list
-                            .borrow_mut()
-                            .push(Rc::new(new_subject.as_ref().clone().into())),
-                        // “If direction is 'forward' then the following triple is generated:
-                        IncompleteTriple::Forward(predicate) => {
-                            self.emit_output(TripleRef::new(
-                                // subject = parent subject
-                                eval_context.parent_subject.as_ref(),
-                                // predicate = the predicate from the iterated incomplete triple
-                                predicate.as_ref(),
-                                // object = new subject
-                                new_subject.as_ref(),
-                            ));
-                        }
-                        // “If direction is 'reverse' then this is the triple generated:
-                        IncompleteTriple::Reverse(predicate) => {
-                            self.emit_output(TripleRef::new(
-                                // subject = new subject
-                                new_subject.as_ref(),
-                                // predicate = the predicate from the iterated incomplete triple
-                                predicate.as_ref(),
-                                // object = parent subject
-                                eval_context.parent_subject.as_ref(),
-                            ));
-                        }
+        if !local.skip_element
+            && let Some(new_subject) = &local.new_subject
+        {
+            // “The list of incomplete triples from the current evaluation context
+            //  (not the local list of incomplete triples) will contain zero or more predicate
+            //  IRIs. This list is iterated over and each of the predicates is used with parent
+            //  subject and new subject to generate a triple or add a new element to the local
+            //  list mapping. Note that at each level there are two lists of incomplete triples;
+            //  one for the current processing level (which is passed to each child element in
+            //  the previous step), and one that was received as part of the evaluation context.
+            //  It is the latter that is used in processing during this step.
+            for incomplete in eval_context.incomplete_triples.iter() {
+                // “Note that each incomplete triple has a direction value that is used to determine
+                //  what will become the subject, and what will become the object, of each generated triple:
+                match incomplete {
+                    // “If direction is 'none',
+                    //  the new subject is added to the list from the iterated incomplete triple.
+                    IncompleteTriple::List(_name, list) => list
+                        .borrow_mut()
+                        .push(Rc::new(new_subject.as_ref().clone().into())),
+                    // “If direction is 'forward' then the following triple is generated:
+                    IncompleteTriple::Forward(predicate) => {
+                        self.emit_output(TripleRef::new(
+                            // subject = parent subject
+                            eval_context.parent_subject.as_ref(),
+                            // predicate = the predicate from the iterated incomplete triple
+                            predicate.as_ref(),
+                            // object = new subject
+                            new_subject.as_ref(),
+                        ));
+                    }
+                    // “If direction is 'reverse' then this is the triple generated:
+                    IncompleteTriple::Reverse(predicate) => {
+                        self.emit_output(TripleRef::new(
+                            // subject = new subject
+                            new_subject.as_ref(),
+                            // predicate = the predicate from the iterated incomplete triple
+                            predicate.as_ref(),
+                            // object = parent subject
+                            eval_context.parent_subject.as_ref(),
+                        ));
                     }
                 }
             }

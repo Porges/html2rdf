@@ -113,8 +113,8 @@ pub fn parse(
 
         let base_sel = scraper::selector::Selector::parse("html>head>base").unwrap();
 
-        if let Some(base_el) = doc.select(&base_sel).next() {
-            if let Some(base_href) = base_el.attr("href") {
+        if let Some(base_el) = doc.select(&base_sel).next()
+            && let Some(base_href) = base_el.attr("href") {
                 base =
                     Iri::parse(base_href.to_string()).map_err(|source| Error::IriParseError {
                         source,
@@ -123,7 +123,6 @@ pub fn parse(
 
                 trace!("<base> found: {base}");
             }
-        }
 
         let eval_context = EvaluationContext::new(base);
         proc.run(eval_context, doc)?;
@@ -331,7 +330,7 @@ impl<'b> LocalScope<'b> {
     }
 
     /// An empty CURIE resolves to the [`Self::base`] value.
-    fn empty_curie(&self) -> oxrdf::NamedNodeRef {
+    fn empty_curie(&self) -> oxrdf::NamedNodeRef<'_> {
         oxrdf::NamedNodeRef::new_unchecked(self.eval_context.base.as_str())
     }
 
@@ -876,7 +875,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                     //  instantiated on the current element, use the list as follows:
                 }
                 S::OutputList(subject, list_mapping) => {
-                    if let Some(list_mapping) = Rc::try_unwrap(list_mapping).ok() {
+                    if let Ok(list_mapping) = Rc::try_unwrap(list_mapping) {
                         // 14. (cont)
                         for (iri, list) in list_mapping.into_inner().lists.iter() {
                             // “If there are zero items in the list associated with the IRI, generate the following triple:
@@ -971,11 +970,9 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             trace!(
                 "{}{}{} {attrs}",
                 ancestor_stack.join(">"),
-                ancestor_stack
+                if ancestor_stack
                     .is_empty()
-                    .not()
-                    .then_some(">")
-                    .unwrap_or_default(),
+                    .not() { ">" } else { Default::default() },
                 el.name()
             );
         }
@@ -1460,13 +1457,12 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         // 8.
         // “If in any of the previous steps a new subject
         //  was set to a non-null value different from the parent object;
-        if let Some(ns) = &local.new_subject {
-            if Some(ns) != eval_context.parent_object.as_ref() {
+        if let Some(ns) = &local.new_subject
+            && Some(ns) != eval_context.parent_object.as_ref() {
                 // “The list mapping taken from the evaluation context is set to a new, empty mapping.
                 trace!("- Setting new list mapping");
                 local.list_mappings = Default::default();
             }
-        }
 
         // 9.
         // “If in any of the previous steps a current object resource was set to a non-null value,
@@ -1659,7 +1655,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                         oxrdf::LiteralRef::new_typed_literal(&content_val, datatype).into()
                     }
                 }
-                Attr::Value(NamedOrBlankNode::BlankNode(blank_node)) => todo!(),
+                Attr::Value(NamedOrBlankNode::BlankNode(_blank_node)) => todo!(),
                 Attr::Missing => {
                     if let Some(otherwise_datatype) = otherwise_datatype {
                         // [html-rdfa] extension #9
@@ -1745,8 +1741,8 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         // 12.
         // “If the skip element flag is 'false', and new subject was set to a non-null value,
         //  then any incomplete triples within the current context should be completed:
-        if !local.skip_element {
-            if let Some(new_subject) = &local.new_subject {
+        if !local.skip_element
+            && let Some(new_subject) = &local.new_subject {
                 // “The list of incomplete triples from the current evaluation context
                 //  (not the local list of incomplete triples) will contain zero or more predicate
                 //  IRIs. This list is iterated over and each of the predicates is used with parent
@@ -1789,7 +1785,6 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                     }
                 }
             }
-        }
 
         // 13.
         // “Next, all elements that are children of the current element are processed
