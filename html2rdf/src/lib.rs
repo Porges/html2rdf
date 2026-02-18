@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::{borrow::Cow, str::FromStr};
 
 use curie::{Curie, ExpansionError, PrefixMapping};
-use icu::locale::LanguageIdentifier;
+use icu_locale::LanguageIdentifier;
 use itertools::Itertools;
 use oxiri::{Iri, IriParseError};
 use oxrdf::vocab::{self, rdf};
@@ -612,7 +612,7 @@ pub enum Error {
     #[display("@prefix syntax error: prefix must end with ':'.")]
     NoColonPrefix,
 
-    LanguageIdentifierError(icu::locale::ParseError),
+    LanguageIdentifierError(icu_locale::ParseError),
 }
 
 mod dc_vocab {

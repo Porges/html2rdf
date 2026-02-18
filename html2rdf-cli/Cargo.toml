@@ -1,6 +1,6 @@
 [package]
 name = "html2rdf-cli"
-version = "0.1.0"
+version = "0.2.0"
 authors.workspace = true
 edition.workspace = true
 keywords.workspace = true
@@ -14,10 +14,10 @@ name = "html2rdf"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4.5.38", features = ["derive", "wrap_help"] }
+clap = { version = "4.5.59", features = ["derive", "wrap_help"] }
 html2rdf = { workspace = true }
 oxiri = { workspace = true }
 oxrdf = { workspace = true }
 oxttl = { workspace = true }
-reqwest = { version = "0.12.15", features = ["blocking"] }
-url = "2.5.4"
+reqwest = { version = "0.13.2", default-features = false, features = ["blocking", "charset", "http2", "native-tls", "system-proxy"] }
+url = "2.5.8"
