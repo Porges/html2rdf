@@ -14,6 +14,6 @@ rust-version = "1.82.0"
 
 [workspace.dependencies]
 html2rdf = { path = "html2rdf" }
-oxiri = "^0.2.11"
-oxrdf = "^0.2.4"
-oxttl = "^0.1.8"
+oxiri = "0.2.11"
+oxrdf = "0.3.3"
+oxttl = "0.2.3"

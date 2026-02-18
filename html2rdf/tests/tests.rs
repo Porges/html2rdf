@@ -17,12 +17,12 @@ fn basic_test() {
     let mut processor_graph = Graph::new();
     parse(input, base(), &mut output_graph, &mut processor_graph).unwrap();
 
-    insta::assert_snapshot!(utils::serialize_graph(output_graph, &base()), @r##"
+    insta::assert_snapshot!(utils::serialize_graph(output_graph, &base()), @r"
     @base <http://rdfa.invalid/> .
-    @prefix schema: <//schema.org/> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
+    @prefix schema: <//schema.org/> .
     <> rdfa:usesVocabulary schema: .
-    "##);
+    ");
 
     insta::assert_snapshot!(utils::serialize_graph(processor_graph, &base()), @"");
 }
@@ -44,13 +44,13 @@ fn property_test() {
 
     insta::assert_snapshot!(utils::serialize_graph(processor_graph, &base()), @"");
 
-    insta::assert_snapshot!(utils::serialize_graph(output_graph, &base()), @r##"
+    insta::assert_snapshot!(utils::serialize_graph(output_graph, &base()), @r#"
     @base <http://rdfa.invalid/> .
-    @prefix schema: <//schema.org/> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
+    @prefix schema: <//schema.org/> .
     <> rdfa:usesVocabulary schema: .
     _:c14n0 a schema:Book ;
     	schema:name "bar" .
-    "##);
+    "#);
 }

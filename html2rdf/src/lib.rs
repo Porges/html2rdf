@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::ops::Not;
 use std::rc::Rc;
 use std::{borrow::Cow, str::FromStr};
 
@@ -114,15 +113,15 @@ pub fn parse(
         let base_sel = scraper::selector::Selector::parse("html>head>base").unwrap();
 
         if let Some(base_el) = doc.select(&base_sel).next()
-            && let Some(base_href) = base_el.attr("href") {
-                base =
-                    Iri::parse(base_href.to_string()).map_err(|source| Error::IriParseError {
-                        source,
-                        iri: base_href.to_string(),
-                    })?;
+            && let Some(base_href) = base_el.attr("href")
+        {
+            base = Iri::parse(base_href.to_string()).map_err(|source| Error::IriParseError {
+                source,
+                iri: base_href.to_string(),
+            })?;
 
-                trace!("<base> found: {base}");
-            }
+            trace!("<base> found: {base}");
+        }
 
         let eval_context = EvaluationContext::new(base);
         proc.run(eval_context, doc)?;
@@ -815,7 +814,7 @@ impl HostLanguage for &HTMLHost {
 }
 
 fn emit_processor(pg: &mut Graph, pg_type: PGType, msg: &str) {
-    let warning_subj: oxrdf::Subject = oxrdf::BlankNode::default().into();
+    let warning_subj: oxrdf::NamedOrBlankNode = oxrdf::BlankNode::default().into();
     let pg_type: oxrdf::NamedNodeRef = pg_type.into();
     // new bnode is-a PGClass
     let node = TripleRef::new(&warning_subj, oxrdf::vocab::rdf::TYPE, pg_type);
@@ -970,9 +969,11 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             trace!(
                 "{}{}{} {attrs}",
                 ancestor_stack.join(">"),
-                if ancestor_stack
-                    .is_empty()
-                    .not() { ">" } else { Default::default() },
+                if ancestor_stack.is_empty() {
+                    Default::default()
+                } else {
+                    ">"
+                },
                 el.name()
             );
         }
@@ -1458,11 +1459,12 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         // “If in any of the previous steps a new subject
         //  was set to a non-null value different from the parent object;
         if let Some(ns) = &local.new_subject
-            && Some(ns) != eval_context.parent_object.as_ref() {
-                // “The list mapping taken from the evaluation context is set to a new, empty mapping.
-                trace!("- Setting new list mapping");
-                local.list_mappings = Default::default();
-            }
+            && Some(ns) != eval_context.parent_object.as_ref()
+        {
+            // “The list mapping taken from the evaluation context is set to a new, empty mapping.
+            trace!("- Setting new list mapping");
+            local.list_mappings = Default::default();
+        }
 
         // 9.
         // “If in any of the previous steps a current object resource was set to a non-null value,
@@ -1742,49 +1744,50 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         // “If the skip element flag is 'false', and new subject was set to a non-null value,
         //  then any incomplete triples within the current context should be completed:
         if !local.skip_element
-            && let Some(new_subject) = &local.new_subject {
-                // “The list of incomplete triples from the current evaluation context
-                //  (not the local list of incomplete triples) will contain zero or more predicate
-                //  IRIs. This list is iterated over and each of the predicates is used with parent
-                //  subject and new subject to generate a triple or add a new element to the local
-                //  list mapping. Note that at each level there are two lists of incomplete triples;
-                //  one for the current processing level (which is passed to each child element in
-                //  the previous step), and one that was received as part of the evaluation context.
-                //  It is the latter that is used in processing during this step.
-                for incomplete in eval_context.incomplete_triples.iter() {
-                    // “Note that each incomplete triple has a direction value that is used to determine
-                    //  what will become the subject, and what will become the object, of each generated triple:
-                    match incomplete {
-                        // “If direction is 'none',
-                        //  the new subject is added to the list from the iterated incomplete triple.
-                        IncompleteTriple::List(list) => list
-                            .borrow_mut()
-                            .push(Rc::new(new_subject.as_ref().clone().into())),
-                        // “If direction is 'forward' then the following triple is generated:
-                        IncompleteTriple::Forward(predicate) => {
-                            self.emit_output(TripleRef::new(
-                                // subject = parent subject
-                                eval_context.parent_subject.as_ref(),
-                                // predicate = the predicate from the iterated incomplete triple
-                                predicate.as_ref(),
-                                // object = new subject
-                                new_subject.as_ref(),
-                            ));
-                        }
-                        // “If direction is 'reverse' then this is the triple generated:
-                        IncompleteTriple::Reverse(predicate) => {
-                            self.emit_output(TripleRef::new(
-                                // subject = new subject
-                                new_subject.as_ref(),
-                                // predicate = the predicate from the iterated incomplete triple
-                                predicate.as_ref(),
-                                // object = parent subject
-                                eval_context.parent_subject.as_ref(),
-                            ));
-                        }
+            && let Some(new_subject) = &local.new_subject
+        {
+            // “The list of incomplete triples from the current evaluation context
+            //  (not the local list of incomplete triples) will contain zero or more predicate
+            //  IRIs. This list is iterated over and each of the predicates is used with parent
+            //  subject and new subject to generate a triple or add a new element to the local
+            //  list mapping. Note that at each level there are two lists of incomplete triples;
+            //  one for the current processing level (which is passed to each child element in
+            //  the previous step), and one that was received as part of the evaluation context.
+            //  It is the latter that is used in processing during this step.
+            for incomplete in eval_context.incomplete_triples.iter() {
+                // “Note that each incomplete triple has a direction value that is used to determine
+                //  what will become the subject, and what will become the object, of each generated triple:
+                match incomplete {
+                    // “If direction is 'none',
+                    //  the new subject is added to the list from the iterated incomplete triple.
+                    IncompleteTriple::List(list) => list
+                        .borrow_mut()
+                        .push(Rc::new(new_subject.as_ref().clone().into())),
+                    // “If direction is 'forward' then the following triple is generated:
+                    IncompleteTriple::Forward(predicate) => {
+                        self.emit_output(TripleRef::new(
+                            // subject = parent subject
+                            eval_context.parent_subject.as_ref(),
+                            // predicate = the predicate from the iterated incomplete triple
+                            predicate.as_ref(),
+                            // object = new subject
+                            new_subject.as_ref(),
+                        ));
+                    }
+                    // “If direction is 'reverse' then this is the triple generated:
+                    IncompleteTriple::Reverse(predicate) => {
+                        self.emit_output(TripleRef::new(
+                            // subject = new subject
+                            new_subject.as_ref(),
+                            // predicate = the predicate from the iterated incomplete triple
+                            predicate.as_ref(),
+                            // object = parent subject
+                            eval_context.parent_subject.as_ref(),
+                        ));
                     }
                 }
             }
+        }
 
         // 13.
         // “Next, all elements that are children of the current element are processed

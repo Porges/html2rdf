@@ -188,13 +188,13 @@ struct EvaluationContext {
 
     // “The parent subject. The initial value will be the same as the initial value of base,
     //  but it will usually change during the course of processing.
-    parent_subject: Rc<oxrdf::Subject>,
+    parent_subject: Rc<oxrdf::NamedOrBlankNode>,
 
     // “The parent object. In some situations the object of a statement becomes the subject
     //  of any nested statements, and this member is used to convey this value. Note that this
     //  value may be a bnode, since in some situations a number of nested statements are grouped
     //  together on one bnode. This means that the bnode must be set in the containing statement and passed down.
-    parent_object: Option<Rc<oxrdf::Subject>>, // note that this is a subject, not an object, but the parent object cannot be a term
+    parent_object: Option<Rc<oxrdf::NamedOrBlankNode>>, // note that this is a subject, not an object, but the parent object cannot be a term
 
     // “A list of current, in-scope IRI mappings.
     iri_mappings: Rc<curie::PrefixMapping>,
@@ -237,11 +237,11 @@ struct LocalScope<'a> {
     skip_element: bool,
     // “A new subject value, which once calculated will set the parent subject in an evaluation context,
     //  as well as being used to complete any incomplete triples, as described in the next section.
-    new_subject: Option<Rc<oxrdf::Subject>>,
+    new_subject: Option<Rc<oxrdf::NamedOrBlankNode>>,
     // “A value for the current object resource, the resource to use when creating triples that have a resource object.
-    current_object_resource: Option<Rc<oxrdf::Subject>>,
+    current_object_resource: Option<Rc<oxrdf::NamedOrBlankNode>>,
     // “A value for the typed resource, the source for creating rdf:type relationships to types specified in @typeof.
-    typed_resource: Option<Rc<oxrdf::Subject>>,
+    typed_resource: Option<Rc<oxrdf::NamedOrBlankNode>>,
     // “The local term mappings, a list of terms and their associated IRIs.
     term_mappings: Rc<BTreeMap<String, oxrdf::NamedNode>>,
     // “The local list mapping, mapping IRIs to lists
@@ -704,7 +704,7 @@ impl HostLanguage for &HTMLHost {
 }
 
 fn emit_processor(pg: &mut Graph, pg_type: PGType, msg: &str) {
-    let warning_subj: oxrdf::Subject = oxrdf::BlankNode::default().into();
+    let warning_subj: oxrdf::NamedOrBlankNode = oxrdf::BlankNode::default().into();
     let pg_type: oxrdf::NamedNodeRef = pg_type.into();
     // new bnode is-a PGClass
     let node = TripleRef::new(&warning_subj, oxrdf::vocab::rdf::TYPE, pg_type);
@@ -743,7 +743,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
     fn run(&mut self, eval_context: EvaluationContext, html: Html) -> Result<(), Error> {
         enum S<'a> {
             Child(ElementRef<'a>, Rc<EvaluationContext>),
-            OutputList(Rc<oxrdf::Subject>, Rc<RefCell<ListMapping>>),
+            OutputList(Rc<oxrdf::NamedOrBlankNode>, Rc<RefCell<ListMapping>>),
         }
 
         // TODO: we need a marker on the stack to emit list elements
@@ -1066,8 +1066,8 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         let inlist = el.attr("inlist").is_some();
 
         let has_about = el.attr("about").is_some();
-        let about: Option<Rc<oxrdf::Subject>> =
-            handle_safecurie_or_curie_or_iri(el.attr("about")).map(|x| Rc::new(x.into()));
+        let about: Option<Rc<oxrdf::NamedOrBlankNode>> =
+            handle_safecurie_or_curie_or_iri(el.attr("about")).map(Rc::new);
 
         let type_of = handle_term_or_curie_or_absiri_s(el.attr("typeof"));
 
@@ -1076,12 +1076,12 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         let src = handle_iri(el.attr("src"));
 
         // read from the "resource attributes"
-        let resource_iri: Option<Rc<oxrdf::Subject>> = resource
+        let resource_iri: Option<Rc<oxrdf::NamedOrBlankNode>> = resource
             .or_else(|| href.map(NamedOrBlankNode::from))
             .or_else(|| src.map(NamedOrBlankNode::from))
-            .map(|x| Rc::new(oxrdf::Subject::from(x)));
+            .map(Rc::new);
 
-        let _new_subject: Rc<oxrdf::Subject>;
+        let _new_subject: Rc<oxrdf::NamedOrBlankNode>;
 
         //5.
         // “If the current element contains no @rel or @rev attribute,

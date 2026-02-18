@@ -18,13 +18,13 @@ itertools = "0.14.0"
 oxiri = { workspace = true }
 oxrdf = { workspace = true }
 oxsdatatypes = "0.2.2"
-rdf-canon = "0.15.1"
 rxml_validation = "0.11.0"
 scraper = "0.23.1"
 vec1 = "1.12.1"
 
 [dev-dependencies]
 insta = { version = "1.43.1", features = ["glob"] }
+oxrdf = { workspace = true, features = ["rdfc-10"] }
 oxttl = { workspace = true }
 pretty_assertions = "1.4.1"
 rstest = { version = "0.25.0", default-features = false, features = ["crate-name"] }

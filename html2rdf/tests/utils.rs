@@ -1,12 +1,16 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use oxrdf::Graph;
+use oxrdf::{
+    Graph,
+    graph::{CanonicalizationAlgorithm, CanonicalizationHashAlgorithm},
+    vocab::{rdf, xsd},
+};
 
-pub fn serialize_graph(graph: Graph, base: &str) -> String {
-    // NB: we use rdf_canon here because the one provided by oxrdf hangs
-    let idents = rdf_canon::issue_graph_with::<sha2::Sha256>(&graph, &Default::default()).unwrap();
-    let graph = rdf_canon::relabel_graph(&graph, &idents).unwrap();
+pub fn serialize_graph(mut graph: Graph, base: &str) -> String {
+    graph.canonicalize(CanonicalizationAlgorithm::Rdfc10 {
+        hash_algorithm: CanonicalizationHashAlgorithm::Sha256,
+    });
 
     let mut output = Vec::new();
     let mut ttl = oxttl::TurtleSerializer::new().with_base_iri(base).unwrap();
@@ -23,7 +27,7 @@ pub fn serialize_graph(graph: Graph, base: &str) -> String {
     };
 
     for triple in graph.iter() {
-        if let oxrdf::SubjectRef::NamedNode(n) = triple.subject {
+        if let oxrdf::NamedOrBlankNodeRef::NamedNode(n) = triple.subject {
             add_prefix(n.as_str());
         }
 
@@ -31,10 +35,10 @@ pub fn serialize_graph(graph: Graph, base: &str) -> String {
 
         if let oxrdf::TermRef::NamedNode(n) = triple.object {
             add_prefix(n.as_str());
-        } else if let oxrdf::TermRef::Literal(l) = triple.object {
-            if !l.is_plain() {
-                add_prefix(l.datatype().as_str());
-            }
+        } else if let oxrdf::TermRef::Literal(l) = triple.object
+            && !matches!(l.datatype(), xsd::STRING | rdf::LANG_STRING)
+        {
+            add_prefix(l.datatype().as_str());
         }
     }
 
