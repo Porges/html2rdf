@@ -6,20 +6,16 @@ use std::{borrow::Cow, str::FromStr};
 use curie::{Curie, ExpansionError, PrefixMapping};
 use icu_locale::LanguageIdentifier;
 use itertools::Itertools;
+use mitsein::iter1::IteratorExt;
+use mitsein::prelude::Vec1;
 use oxiri::{Iri, IriParseError};
 use oxrdf::vocab::{self, rdf};
 use oxrdf::{Graph, NamedNode, NamedNodeRef, NamedOrBlankNode, TermRef, TripleRef};
 use scraper::{ElementRef, Html};
-use vec1::{Size0Error, Vec1};
+use tracing::trace;
 
+#[cfg(test)]
 pub mod reference_impl;
-
-macro_rules! trace {
-    ($($args:expr),*) => {
-        #[cfg(debug_assertions)]
-        println!($($args),*);
-    };
-}
 
 pub fn process(
     input: &str,
@@ -824,9 +820,9 @@ fn emit_processor(pg: &mut Graph, pg_type: PGType, msg: &str) {
         dc_vocab::DESCRIPTION,
         oxrdf::LiteralRef::new_simple_literal(msg),
     );
-    trace!("Emitting processor: {node}");
+    trace!(triple = %node, "emitting processor triple");
     pg.insert(node);
-    trace!("Emitting processor: {desc}");
+    trace!(triple = %desc, "emitting processor triple");
     pg.insert(desc);
 }
 
@@ -840,18 +836,24 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
 
     fn run(&mut self, eval_context: EvaluationContext, html: Html) -> Result<(), Error> {
         enum S<'a> {
-            Child(ElementRef<'a>, Rc<EvaluationContext>),
+            Child(ElementRef<'a>, Rc<EvaluationContext>, tracing::Span),
             OutputList(Rc<NamedOrBlankNode>, Rc<RefCell<ListMapping>>),
         }
 
         // TODO: we need a marker on the stack to emit list elements
-        let mut stack = vec![S::Child(html.root_element(), Rc::new(eval_context))];
+        let mut stack = vec![S::Child(
+            html.root_element(),
+            Rc::new(eval_context),
+            tracing::trace_span!("element", name = "html"),
+        )];
 
         let host = HTMLHost {};
 
         while let Some(stack_item) = stack.pop() {
             match stack_item {
-                S::Child(element, base_ctx) => {
+                S::Child(element, base_ctx, parent_span) => {
+                    let _span = parent_span.entered();
+
                     let new_ctx = Rc::new(self.process_element(&base_ctx, element, &host)?);
                     if element.has_children() {
                         stack.push(S::OutputList(
@@ -862,7 +864,11 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
 
                     for child in element.children().rev() {
                         if let Some(elref) = ElementRef::wrap(child) {
-                            stack.push(S::Child(elref, new_ctx.clone()));
+                            stack.push(S::Child(
+                                elref,
+                                new_ctx.clone(),
+                                tracing::trace_span!("element", name = elref.value().name()),
+                            ));
                         }
                     }
 
@@ -900,7 +906,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
     }
 
     fn emit_output(&self, tr: TripleRef) {
-        trace!("- Emitting output triple: {tr}");
+        trace!(triple = %tr, "emitting output triple");
         self.output_graph.borrow_mut().insert(tr);
     }
 
@@ -911,6 +917,8 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         element: scraper::ElementRef,
         host: impl HostLanguage,
     ) -> Result<EvaluationContext, Error> {
+        trace!(element = ?element, "processing element");
+
         let emit_warning = |pgtype: PGType, msg: String| {
             let mut pg = self.processor_graph.borrow_mut();
             emit_processor(&mut pg, pgtype, &msg);
@@ -936,8 +944,8 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
 
         let attr_many = |name, proj: &dyn Fn(&str) -> Vec<NamedOrBlankNode>| match el.attr(name) {
             None => Attr::Missing,
-            Some(v) => match Vec1::try_from_vec(proj(v)) {
-                Err(Size0Error) => Attr::Empty,
+            Some(v) => match Vec1::try_from(proj(v)) {
+                Err(_) => Attr::Empty,
                 Ok(v) => Attr::Value(v),
             },
         };
@@ -946,17 +954,18 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             |name, proj: &dyn Fn(&str) -> Vec<NamedOrBlankNode>| match el.attr(name) {
                 None => Attr::Missing,
                 Some(v) => {
-                    let data = proj(v)
+                    match proj(v)
                         .into_iter()
                         .filter_map(|v| self.to_predicate(name, v))
-                        .collect();
-                    match Vec1::try_from_vec(data) {
-                        Err(Size0Error) => Attr::Empty,
+                        .try_collect1()
+                    {
+                        Err(_) => Attr::Empty,
                         Ok(v) => Attr::Value(v),
                     }
                 }
             };
 
+        /*
         if cfg!(debug_assertions) {
             let mut ancestor_stack = Vec::new();
             ancestor_stack.extend(
@@ -977,6 +986,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                 el.name()
             );
         }
+        */
 
         let is_root_element = el.name() == "html";
         debug_assert!(is_root_element == eval_context.parent_object.is_none());
@@ -988,14 +998,14 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         // > Next the current element is examined for any change to the default vocabulary via @vocab.
         if let Some(vocab) = el.attr("vocab") {
             if vocab.is_empty() {
-                trace!("- @vocab is empty, resetting default vocabulary");
+                trace!("@vocab is empty, resetting default vocabulary to host language default");
                 // > If the value is empty, then the local default vocabulary
                 // > MUST be reset to the Host Language defined default (if any).
                 local.default_vocab = host.default_vocabulary();
             }
             // > If @vocab is present and contains a value,
             else if let Ok(vocab) = local.resolve_relative_iri(vocab) {
-                trace!("- default vocabulary is now: {vocab}");
+                trace!(vocabulary = %vocab, "default vocabulary set via @vocab");
                 // > the local default vocabulary is updated according to the
                 // > section on CURIE and IRI Processing.
                 //
@@ -1067,7 +1077,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             } else {
                 match LanguageIdentifier::from_str(lang) {
                     Ok(lang) => {
-                        trace!("- current language is now: {lang}");
+                        trace!(current_language = %lang, "current language set");
                         local.current_language = Some(Rc::new(lang));
                     }
                     Err(e) => {
@@ -1211,7 +1221,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                 // >
                 // > - by using the resource from @about, if present,
                 if let Some(about) = about.value() {
-                    trace!("- Using @about as new subject");
+                    trace!(new_subject = %about, "using @about as new subject");
                     //  obtained according to the section on CURIE and IRI Processing;
                     local.new_subject = Some(about.clone());
                 }
@@ -1219,16 +1229,14 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                 else if is_root_element {
                     //  then act as if there is an empty @about present,
                     //  and process it according to the rule for @about, above;
-                    trace!("- Using empty @about as new subject");
-                    local.new_subject = Some(Rc::new(local.empty_curie().into()));
+                    let new_subject = Rc::new(local.empty_curie().into());
+                    trace!(new_subject = %new_subject, "using empty @about as new subject");
+                    local.new_subject = Some(new_subject);
                 }
                 // > - otherwise, if parent object is present, new subject is set to the value of parent object.
-                else if eval_context.parent_object.is_some() {
-                    trace!(
-                        "- Using parent object as new subject: {}",
-                        eval_context.parent_object.as_ref().unwrap()
-                    );
-                    local.new_subject = eval_context.parent_object.clone();
+                else if let Some(parent_obj) = &eval_context.parent_object {
+                    trace!(new_subject = %parent_obj, "using parent object as new subject");
+                    local.new_subject = Some(parent_obj.clone());
                 }
 
                 // “If @typeof is present then typed resource is set to the resource obtained from
@@ -1237,7 +1245,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                     // “by using the resource from @about, if present,
                     if let Some(about) = about.value() {
                         //  obtained according to the section on CURIE and IRI Processing;
-                        trace!("- Using @about as typed resource");
+                        trace!(typed_resource = %about, "using @about as typed resource");
                         local.typed_resource = Some(about.clone());
                     }
                     // “otherwise, if the element is the root element of the document,
@@ -1253,12 +1261,14 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                             // “otherwise, by using the IRI from @href, if present, obtained according to the section on CURIE and IRI Processing;
                             // “otherwise, by using the IRI from @src, if present, obtained according to the section on CURIE and IRI Processing;
                             if let Some(resource) = &resource_value {
-                                 resource.clone()
+                                trace!(typed_resource = %resource, "using @resource/@href/@src as typed resource");
+                                resource.clone()
                             }
                             // “otherwise, the value of typed resource is set to a newly created bnode.
                             else {
-                                trace!("- Using new blank node as typed resource");
-                                Rc::new(oxrdf::BlankNode::default().into())
+                                let typed_resource = oxrdf::BlankNode::default().into();
+                                trace!(typed_resource = %typed_resource, "using new blank node as typed resource");
+                                Rc::new(typed_resource)
                             };
 
                         // “The value of the current object resource is then set to the value of typed resource.
@@ -1280,13 +1290,13 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                     if let Some(about) = about.value() {
                         // > by using the resource from @about, if present,
                         // > obtained according to the section on CURIE and IRI Processing;
-                        trace!("- Using @about as new subject");
+                        trace!(new_subject = %about, "using @about as new subject");
                         local.new_subject = Some(about.clone())
                     } else if let Some(resource) = &resource_value {
                         // “otherwise, by using the resource from @resource, if present, obtained according to the section on CURIE and IRI Processing;
                         // “otherwise, by using the IRI from @href, if present, obtained according to the section on CURIE and IRI Processing;
                         // “otherwise, by using the IRI from @src, if present, obtained according to the section on CURIE and IRI Processing.
-                        trace!("- Using @resource/@href/@src as new subject");
+                        trace!(new_subject = %resource, "using @resource/@href/@src as new subject");
                         local.new_subject = Some(resource.clone());
                     }
                 }
@@ -1297,10 +1307,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                     // > (e.g., @about, @href, @resource, or @src), then
                     // > first check to see if the element is the head or
                     // > body element. If it is, then set new subject to parent object.
-                    trace!(
-                        "- [head/body] using parent object as new subject: {}",
-                        eval_context.parent_object.as_ref().unwrap()
-                    );
+                    trace!(new_subject = %eval_context.parent_object.as_ref().unwrap(), "[head/body] using parent object as new subject");
                     local.new_subject = eval_context.parent_object.clone();
                 }
 
@@ -1311,33 +1318,27 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                     if is_root_element {
                         // > then act as if there is an empty @about present,
                         // > and process it according to the rule for @about, above;
-                        local.new_subject = Some(Rc::new(local.empty_curie().into()));
-                        trace!(
-                            "- Using empty CURIE as new subject (root element): {}",
-                            local.new_subject.as_ref().unwrap()
-                        );
+                        let new_subject = Rc::new(local.empty_curie().into());
+                        trace!(new_subject = %new_subject, "[root element] using empty CURIE as new subject");
+                        local.new_subject = Some(new_subject);
                     }
                     // > otherwise, if @typeof is present,
                     else if type_of.is_present() {
                         // > then new subject is set to be a newly created bnode;
-                        local.new_subject = Some(Rc::new(oxrdf::BlankNode::default().into()));
-                        trace!(
-                            "- Using blank node as new subject (@typeof present): {}",
-                            local.new_subject.as_ref().unwrap()
-                        );
+                        let new_subject = Rc::new(oxrdf::BlankNode::default().into());
+                        trace!(new_subject = %new_subject, "using blank node as new subject (@typeof present)");
+                        local.new_subject = Some(new_subject);
                     }
                     // > otherwise, if parent object is present,
-                    else if eval_context.parent_object.is_some() {
+                    else if let Some(parent_obj) = &eval_context.parent_object {
+                        trace!(new_subject = %parent_obj, "using parent object as new subject");
+
                         // “new subject is set to the value of parent object.
-                        local.new_subject = eval_context.parent_object.clone();
-                        trace!(
-                            "- Using parent object as new subject: {}",
-                            local.new_subject.as_ref().unwrap()
-                        );
+                        local.new_subject = Some(parent_obj.clone());
 
                         // “Additionally, if @property is not present then the skip element flag is set to 'true'.
                         if !property.is_present() {
-                            trace!("- Skip element set to 'true' (no @property).");
+                            trace!("skip element set to 'true' (no @property present)");
                             local.skip_element = true;
                         }
                     }
@@ -1360,17 +1361,14 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             // > new subject is set to the resource obtained from the first match from the following rules:
             // > by using the resource from @about, if present, obtained according to the section on CURIE and IRI Processing;
             if let Some(about) = about.value() {
-                trace!("- Using @about as new subject: {:?}", about);
+                trace!(new_subject = %about, "using @about as new subject");
                 local.new_subject = Some(about.clone());
 
                 //TODO: check inside/outside parent if
                 // “if the @typeof attribute is present, set typed resource to new subject.
                 if type_of.is_present() {
                     local.typed_resource = local.new_subject.clone();
-                    trace!(
-                        "- Using new subject as typed resource (@typeof present): {:?}",
-                        local.typed_resource.as_ref()
-                    );
+                    trace!(typed_resource = %about, "using new subject (@about) as typed resource (@typeof present)");
                 }
             }
 
@@ -1380,18 +1378,13 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                 if is_root_element {
                     // “then act as if there is an empty @about present,
                     //  and process it according to the rule for @about, above;
-                    local.new_subject = Some(Rc::new(local.empty_curie().into()));
-                    trace!(
-                        "- Using empty CURIE as new subject (root element): {}",
-                        local.new_subject.as_ref().unwrap()
-                    );
-                } else {
+                    let new_subject = Rc::new(local.empty_curie().into());
+                    trace!(new_subject = %new_subject, "using empty CURIE as new subject (root element)");
+                    local.new_subject = Some(new_subject);
+                } else if let Some(parent_obj) = &eval_context.parent_object {
                     // ”otherwise, if parent object is present, new subject is set to that.
-                    local.new_subject = eval_context.parent_object.clone();
-                    trace!(
-                        "- Using parent object as new subject: {}",
-                        local.new_subject.as_ref().unwrap()
-                    );
+                    trace!(new_subject = %parent_obj, "using parent object as new subject");
+                    local.new_subject = Some(parent_obj.clone());
                 }
             }
 
@@ -1400,29 +1393,24 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                 // “by using the resource from @resource, if present, obtained according to the section on CURIE and IRI Processing;
                 //  otherwise, by using the IRI from @href, if present, obtained according to the section on CURIE and IRI Processing;
                 //  otherwise, by using the IRI from @src, if present, obtained according to the section on CURIE and IRI Processing;
-                local.current_object_resource = Some(resource.clone().into());
                 trace!(
-                    "- Using @resource/@href/@src as current object resource: {:?}",
-                    local.current_object_resource
+                    current_object_resource = %resource,
+                    "using @resource/@href/@src as current object resource"
                 );
+                local.current_object_resource = Some(resource.clone().into());
             }
             // “otherwise, if @typeof is present and @about is not, use a newly created bnode.
             else if type_of.is_present() && !about.is_present() {
-                local.current_object_resource = Some(Rc::new(oxrdf::BlankNode::default().into()));
-                trace!(
-                    "- Using blank node as current object resource (@typeof present): {}",
-                    local.current_object_resource.as_ref().unwrap()
-                );
+                let current_object_resource = Rc::new(oxrdf::BlankNode::default().into());
+                trace!(%current_object_resource, "using blank node as current object resource (@typeof present)");
+                local.current_object_resource = Some(current_object_resource);
             }
 
             // “If @typeof is present and @about is not,
             if type_of.is_present() && !about.is_present() {
                 // “set typed resource to current object resource.
+                trace!(typed_resource = ?local.current_object_resource, "using current object resource as typed resource (@typeof but no @about)");
                 local.typed_resource = local.current_object_resource.clone();
-                trace!(
-                    "- Using current object resource as typed resource (@typeof but no @about): {}",
-                    local.typed_resource.as_ref().unwrap()
-                );
             }
 
             // “Note that final value of the current object resource will either be null
@@ -1462,7 +1450,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             && Some(ns) != eval_context.parent_object.as_ref()
         {
             // “The list mapping taken from the evaluation context is set to a new, empty mapping.
-            trace!("- Setting new list mapping");
+            trace!("new list mapping set");
             local.list_mappings = Default::default();
         }
 
@@ -1470,7 +1458,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         // “If in any of the previous steps a current object resource was set to a non-null value,
         //  it is now used to generate triples and add entries to the local list mapping:
         if let Some(current_object_resource) = local.current_object_resource.as_deref() {
-            trace!("  - current object resource: {}", current_object_resource);
+            trace!(%current_object_resource, "generating triples");
             if let Some(relations) = &relations {
                 let term: Rc<oxrdf::Term> = Rc::new((*current_object_resource).clone().into());
                 for relation in relations {
@@ -1528,9 +1516,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         // > that can be used as the object.
         else if let Some(revrel) = &relations {
             debug_assert!(local.current_object_resource.is_none());
-            trace!(
-                "- current object resource is null, storing incomplete triples against new blank node"
-            );
+            trace!("generating incomplete triples (current object resource null)");
             // > Also, current object resource should be set to a newly created bnode
             // > (so that the incomplete triples have a subject to connect to if they are ultimately turned into triples);
             local.current_object_resource = Some(Rc::new(oxrdf::BlankNode::default().into()));
@@ -1616,7 +1602,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
 
             let current_property_value: oxrdf::Term = match &datatype {
                 Attr::Empty => {
-                    trace!("- Empty datatype, using plain literal");
+                    trace!("datatype empty, using plain literal");
                     // “otherwise, as a plain literal if @datatype is present but has an empty value
                     //  according to the section on CURIE and IRI Processing. The actual literal is
                     //  either the value of @content (if present) or a string created by concatenating

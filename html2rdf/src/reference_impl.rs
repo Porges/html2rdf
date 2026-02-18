@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::ops::Not;
 use std::rc::Rc;
 use std::{borrow::Cow, str::FromStr};
 
@@ -11,13 +10,7 @@ use oxiri::Iri;
 use oxrdf::vocab::{self, rdf};
 use oxrdf::{Graph, NamedNodeRef, NamedOrBlankNode, TermRef, TripleRef};
 use scraper::{ElementRef, Html};
-
-macro_rules! trace {
-    ($($args:expr),*) => {
-        #[cfg(debug_assertions)]
-        println!($($args),*);
-    };
-}
+use tracing::trace;
 
 pub fn process(
     input: &str,
@@ -831,10 +824,10 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             trace!(
                 "{}{}{} {attrs}",
                 ancestor_stack.join(">"),
-                if ancestor_stack.is_empty().not() {
-                    ">"
-                } else {
+                if ancestor_stack.is_empty() {
                     Default::default()
+                } else {
+                    ">"
                 },
                 el.name()
             );
