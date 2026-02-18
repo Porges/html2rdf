@@ -9,12 +9,13 @@ struct Args {
     target: url::Url,
 }
 
-fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::Client::new();
     let base = args.target.to_string();
     let base_iri = oxiri::Iri::parse(base.clone())?;
-    let response = client.get(args.target).send()?.error_for_status()?;
+    let response = client.get(args.target).send().await?.error_for_status()?;
     let content_type = response
         .headers()
         .get(reqwest::header::CONTENT_TYPE)
@@ -25,7 +26,9 @@ fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
         return Ok(ExitCode::FAILURE);
     }
 
-    let content = response.text()?;
+    drop(client);
+
+    let content = response.text().await?;
     let mut output_graph = oxrdf::Graph::new();
     let mut processor_graph = oxrdf::Graph::new();
     html2rdf::process(
