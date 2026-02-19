@@ -10,9 +10,11 @@ pub fn ttl_equality(
     #[base_dir = "tests/test-suite/test-cases/"]
     #[files("rdfa1.1*/*html5/*.*html")]
     // exclude vocabulary expansion tests
+    #[exclude("rdfa1\\.1-vocab")]
     // - 0240, 0241, 0242 are also vocab tests
+    #[exclude("024[0-2]")]
     // - 0313, 0235-0239 are processor-graph tests
-    #[exclude("(rdfa1\\.1-vocab|024[0-2]|0313|023[5-9])")]
+    #[exclude("0313|023[5-9]")]
     // TODO: these tests are broken? or is this RDF-star?
     #[exclude("(028[12])")]
     // XHTML is not properly supported, yet
