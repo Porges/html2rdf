@@ -9,6 +9,7 @@ publish.workspace = true
 readme.workspace = true
 repository.workspace = true
 
+
 [[bin]]
 name = "html2rdf"
 path = "src/main.rs"

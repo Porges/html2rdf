@@ -788,14 +788,6 @@ impl HostLanguage for &HTMLHost {
         None // TODO
     }
 
-    // “The current language can be set using either the @lang
-    //  or @xml:lang attributes. When the @lang attribute and
-    //  the @xml:lang attribute are specified on the same element,
-    //  the @xml:lang attribute takes precedence. When both @lang
-    //  and @xml:lang are specified on the same element, they MUST
-    //  have the same value. Further details related to setting the
-    //  current language can be found in section 3.3 Specifying the
-    //  Language for a Literal.
     fn default_language(&self) -> Option<LanguageIdentifier> {
         None
     }
@@ -805,6 +797,18 @@ impl HostLanguage for &HTMLHost {
     //  be applied after the initial context for [rdfa-core]
     //  (http://www.w3.org/2011/rdfa-context/rdfa-1.1).
     // NB: note that the "additional initial context" is currently empty.
+}
+
+struct XHTMLHost {}
+
+impl HostLanguage for &XHTMLHost {
+    fn default_language(&self) -> Option<LanguageIdentifier> {
+        None // TODO
+    }
+
+    fn default_vocabulary(&self) -> Option<oxrdf::NamedNode> {
+        None // TODO
+    }
 }
 
 fn emit_processor(pg: &mut Graph, pg_type: PGType, msg: &str) {
@@ -852,7 +856,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                 S::Child(element, base_ctx, parent_span) => {
                     let _span = parent_span.entered();
 
-                    let new_ctx = Rc::new(self.process_element(&base_ctx, element, &host)?);
+                    let new_ctx = Rc::new(self.process_element(&base_ctx, &html, element, &host)?);
                     if element.has_children() {
                         stack.push(S::OutputList(
                             new_ctx.parent_subject.clone(),
@@ -912,6 +916,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
     fn process_element(
         &mut self,
         eval_context: &EvaluationContext,
+        html: &scraper::Html,
         element: scraper::ElementRef,
         host: impl HostLanguage,
     ) -> Result<EvaluationContext, Error> {
@@ -1023,11 +1028,31 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         // 3.
         // “Next, the current element is examined for IRI mappings and these are added to the local list of IRI mappings.
         //  Note that an IRI mapping will simply overwrite any current mapping in the list that has the same name;
+        //
+        // [HTML-RDFA]
+        // “Extracting URI Mappings declared via @xmlns: while operating from within a DOM Level 2 based RDFa processor
+        //  can be achieved using the following algorithm:
+        // “While processing each DOM2 [Element] as described in [rdfa-core], Section 7.5: Sequence, Step #2:
+        // “1. For each [Attr] in the [Node.attributes] list that has a [namespace prefix] value of @xmlns,
+        //     create an [IRI mapping] by storing the [local name] as the value to be mapped, and the
+        //     [Node.nodeValue] as the value to map.
+        // (Note: this is not done because html5ever/scraper never reports namespace prefixes…)
+        // “2. For each [Attr] in the [Node.attributes] list that has a [namespace prefix] value of null
+        //     and a [local name] that starts with @xmlns:, create an [IRI mapping] by storing the [local name]
+        //     part with the @xmlns: characters removed as the value to be mapped, and the [Node.nodeValue] as
+        //     the value to map.
+        // (Note: this is what is implemented below…)
         let xmlns_prefixes = el
             .attrs
             .iter()
-            .filter(|(qn, _)| qn.prefix.as_deref() == Some("xmlns"))
-            .map(|(qn, val)| (qn.local.as_ref(), val.as_ref()))
+            .filter_map(|(qn, value)| -> Option<_> {
+                if qn.prefix.is_none() {
+                    let prefix = qn.local.strip_prefix("xmlns:")?;
+                    Some((prefix, value))
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<_>>();
 
         let prefixes = el
@@ -1069,6 +1094,16 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         // 4. Language
         // “The current element is also parsed for any language information,
         //  and if present, current language is set accordingly;
+        //
+        // [HTML-RDFA] 3.1
+        // “The current language can be set using either the @lang
+        //  or @xml:lang attributes. When the @lang attribute and
+        //  the @xml:lang attribute are specified on the same element,
+        //  the @xml:lang attribute takes precedence. When both @lang
+        //  and @xml:lang are specified on the same element, they MUST
+        //  have the same value. Further details related to setting the
+        //  current language can be found in section 3.3 Specifying the
+        //  Language for a Literal.
         if let Some(lang) = el.attr("xml:lang").or(el.attr("lang")) {
             if lang.is_empty() {
                 local.current_language = None;
@@ -1621,6 +1656,40 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                         //  the element itself, and giving it a datatype of XMLLiteral in the vocabulary
                         //  http://www.w3.org/1999/02/22-rdf-syntax-ns#. The format of the resulting
                         //  serialized content is as defined in Exclusive XML Canonicalization Version 1.0 [XML-EXC-C14N].
+                        //
+                        // [HTML-RDFA]
+                        // “When generating literals of type XMLLiteral, the processor MUST ensure that the
+                        //  output XMLLiteral is a namespace well-formed XML fragment. A namespace well-formed XML
+                        //  fragment has the following properties:
+                        // “- The XML fragment, when placed inside of a single root element, MUST validate as well-formed
+                        //    XML. The normative language that describes a well-formed XML document is specified in
+                        //    Section 2.1 "Well-Formed XML Documents" of the XML specification.
+                        // “- The XML fragment, when placed inside of a single root element, MUST retain all active
+                        //    namespace information. The currently active attributes declared using @xmlns and @xmlns:
+                        //    that are stored in the RDFa processor's current evaluation context in the IRI mappings
+                        //    MUST be preserved in the generated XMLLiteral. The PREFIX value for @xmlns:PREFIX MUST
+                        //    be entirely transformed into lower-case characters when preserving the value in the
+                        //    XMLLiteral. All active namespaces declared via @xmlns, @xmlns:, and @prefix MUST be
+                        //    placed in each top-level element in the generated XMLLiteral, taking care to not overwrite
+                        //    pre-existing namespace values.
+                        // (TODO: the above is not yet implemented, since I can't figure out how to work with
+                        //  the scraper API effectively here...)
+                        /*
+                        let mut output = String::new();
+                        for child in element.children() {
+                            if let Some(el) = child.value().as_element() {
+                                let mut el = el.clone();
+                                for (prefix, iri) in local.iri_mappings.mappings() {
+                                    let name = html5ever::QualName::new(
+                                        None,
+                                        html5ever::ns!(xmlns),
+                                        html5ever::LocalName::from(prefix.as_str()),
+                                    );
+                                    el.attrs.push((name, iri.to_string().into()));
+                                }
+                            } else {
+                            }
+                        } */
                         serialized = element.inner_html();
                         oxrdf::LiteralRef::new_typed_literal(&serialized, datatype).into()
                         // TODO: incorrect, needs to be c14n'd

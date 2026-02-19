@@ -8,13 +8,15 @@ mod utils;
 #[rstest]
 pub fn ttl_equality(
     #[base_dir = "tests/test-suite/test-cases/"]
-    #[files("rdfa1.1*/html5/*.html")]
+    #[files("rdfa1.1*/*html5/*.*html")]
     // exclude vocabulary expansion tests
     // - 0240, 0241, 0242 are also vocab tests
     // - 0313, 0235-0239 are processor-graph tests
     #[exclude("(rdfa1\\.1-vocab|024[0-2]|0313|023[5-9])")]
     // TODO: these tests are broken? or is this RDF-star?
     #[exclude("(028[12])")]
+    // XHTML is not properly supported, yet
+    #[exclude("xhtml5/(0198|0319).xhtml")]
     path: PathBuf,
 ) {
     let relpath = path
