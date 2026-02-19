@@ -1,14 +1,13 @@
-use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::rc::Rc;
-use std::{borrow::Cow, str::FromStr};
+use std::{borrow::Cow, cell::RefCell, collections::BTreeMap, rc::Rc, str::FromStr};
 
 use curie::{Curie, ExpansionError, PrefixMapping};
 use icu_locale::LanguageIdentifier;
 use itertools::Itertools;
 use oxiri::Iri;
-use oxrdf::vocab::{self, rdf};
-use oxrdf::{Graph, NamedNodeRef, NamedOrBlankNode, TermRef, TripleRef};
+use oxrdf::{
+    Graph, NamedNodeRef, NamedOrBlankNode, TermRef, TripleRef,
+    vocab::{self, rdf},
+};
 use scraper::{ElementRef, Html};
 use tracing::trace;
 

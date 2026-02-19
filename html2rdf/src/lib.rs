@@ -1,16 +1,14 @@
-use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::rc::Rc;
-use std::{borrow::Cow, str::FromStr};
+use std::{borrow::Cow, cell::RefCell, collections::BTreeMap, rc::Rc, str::FromStr};
 
 use curie::{Curie, ExpansionError, PrefixMapping};
 use icu_locale::LanguageIdentifier;
 use itertools::Itertools;
-use mitsein::iter1::IteratorExt;
-use mitsein::prelude::Vec1;
+use mitsein::{iter1::IteratorExt, prelude::Vec1};
 use oxiri::{Iri, IriParseError};
-use oxrdf::vocab::{self, rdf};
-use oxrdf::{Graph, NamedNode, NamedNodeRef, NamedOrBlankNode, TermRef, TripleRef};
+use oxrdf::{
+    Graph, NamedNode, NamedNodeRef, NamedOrBlankNode, TermRef, TripleRef,
+    vocab::{self, rdf},
+};
 use scraper::{ElementRef, Html};
 use tracing::trace;
 
@@ -116,7 +114,7 @@ pub fn parse(
                 iri: base_href.to_string(),
             })?;
 
-            trace!("<base> found: {base}");
+            trace!(%base, "<base> found");
         }
 
         let eval_context = EvaluationContext::new(base);
