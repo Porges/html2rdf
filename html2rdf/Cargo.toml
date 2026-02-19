@@ -9,9 +9,21 @@ publish.workspace = true
 readme.workspace = true
 repository.workspace = true
 
+exclude = [
+    "tests/test-suite/test-cases/*/html4*/*",
+    "tests/test-suite/test-cases/*/xml*/*",
+    "tests/test-suite/test-cases/*/xhtml1*/*",
+    "tests/test-suite/test-cases/*/svg*/*",
+]
+
 [dependencies]
 curie = "0.1.4"
-derive_more = { version = "2.1.1", features = ["display", "error", "from", "from_str"] }
+derive_more = { version = "2.1.1", features = [
+    "display",
+    "error",
+    "from",
+    "from_str",
+] }
 icu_locale = { version = "2.1.1" }
 indexmap = "2.13.0"
 itertools = "0.14.0"
@@ -28,5 +40,7 @@ insta = { version = "1.46.3", features = ["glob"] }
 oxrdf = { workspace = true, features = ["rdfc-10"] }
 oxttl = { workspace = true }
 pretty_assertions = "1.4.1"
-rstest = { version = "0.26.1", default-features = false, features = ["crate-name"] }
+rstest = { version = "0.26.1", default-features = false, features = [
+    "crate-name",
+] }
 sha2 = "0.10.9"
