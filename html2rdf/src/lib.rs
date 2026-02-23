@@ -286,6 +286,7 @@ struct LocalScope<'a> {
 
 enum CurieError {
     EmptyCurie,
+    InvalidBlankNodeSuffix(String),
     InvalidIRI(String),
     ExpansionError(curie::ExpansionError),
 }
@@ -399,7 +400,9 @@ impl<'b> LocalScope<'b> {
                     return Ok(self.eval_context.empty_bnode.clone().into());
                 }
 
-                return Ok(oxrdf::BlankNode::new(suffix).expect("TODO").into());
+                return Ok(oxrdf::BlankNode::new(suffix)
+                    .map_err(|_| CurieError::InvalidBlankNodeSuffix(suffix.to_string()))?
+                    .into());
             }
 
             Curie::new(Some(prefix), suffix)
@@ -433,6 +436,14 @@ impl<'b> LocalScope<'b> {
                     match err {
                         CurieError::EmptyCurie
                         | CurieError::ExpansionError(ExpansionError::MissingDefault) => {}
+                        CurieError::InvalidBlankNodeSuffix(suffix) => {
+                            (self.emit_warning)(
+                                PGType::UnresolvedCurie,
+                                format!(
+                                    "Invalid CURIE: {value} (invalid blank node suffix: `{suffix}`)",
+                                ),
+                            );
+                        }
                         CurieError::InvalidIRI(iri) => {
                             (self.emit_warning)(
                                 PGType::UnresolvedCurie,
