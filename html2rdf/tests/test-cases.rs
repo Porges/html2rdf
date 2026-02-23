@@ -15,8 +15,6 @@ pub fn ttl_equality(
     #[exclude("024[0-2]")]
     // - 0313, 0235-0239 are processor-graph tests
     #[exclude("0313|023[5-9]")]
-    // TODO: these tests are broken? or is this RDF-star?
-    #[exclude("(028[12])")]
     // XHTML is not properly supported, yet
     #[exclude("xhtml5/(0198|0319).xhtml")]
     path: PathBuf,
@@ -48,7 +46,26 @@ pub fn ttl_equality(
     let mut ttl_graph = Graph::new();
     {
         let ttl_content = path.with_extension("ttl");
-        let ttl = std::fs::read_to_string(ttl_content).unwrap();
+        let mut ttl = std::fs::read_to_string(&ttl_content).unwrap();
+        // HACK: four test cases are garbled, fix them up manually:
+        ttl = ttl.replace(
+            "<<http://rdfa.info/test-suite/test-cases/rdfa1.1/html5/0284.html>>",
+            "<http://rdfa.info/test-suite/test-cases/rdfa1.1-lite/html5/0281.html>",
+        );
+        ttl = ttl.replace(
+            "<<http://rdfa.info/test-suite/test-cases/rdfa1.1/html5/0282.html>>",
+            "<http://rdfa.info/test-suite/test-cases/rdfa1.1-lite/html5/0282.html>",
+        );
+        if ttl_content.to_string_lossy().contains("rdfa1.1-lite") {
+            ttl = ttl.replace(
+                "<http://rdfa.info/test-suite/test-cases/rdfa1.1/xhtml5/0281.xhtml>",
+                "<http://rdfa.info/test-suite/test-cases/rdfa1.1-lite/xhtml5/0281.xhtml>",
+            );
+            ttl = ttl.replace(
+                "<http://rdfa.info/test-suite/test-cases/rdfa1.1/xhtml5/0282.xhtml>",
+                "<http://rdfa.info/test-suite/test-cases/rdfa1.1-lite/xhtml5/0282.xhtml>",
+            );
+        }
         let ttl = ttl.replace("\r\n", "\n");
         let ttl_rdf = oxttl::TurtleParser::new().for_slice(ttl.as_bytes());
         for triple in ttl_rdf {

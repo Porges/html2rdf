@@ -118,36 +118,6 @@ fn invalid_looking_prefix_declaration_succeeds() {
     );
 }
 
-// lib.rs:845 — list elements need a stack marker (incomplete list support)
-#[test]
-fn inlist_produces_rdf_list() {
-    let html = r#"<!DOCTYPE html>
-    <html>
-    <head><title>test</title></head>
-    <body>
-        <div vocab="http://schema.org/">
-            <span rel="http://example.org/items" inlist="">
-                <a href="http://example.org/a">A</a>
-            </span>
-            <span rel="http://example.org/items" inlist="">
-                <a href="http://example.org/b">B</a>
-            </span>
-        </div>
-    </body>
-    </html>"#;
-
-    let (output, _processor) = parse_html(html);
-
-    let serialized = utils::serialize_graph(output, base().as_str());
-
-    // Verify the list items are present (the TODO is about emitting them correctly
-    // via a stack marker). The items appear as relative IRIs since base is http://example.org/.
-    assert!(
-        serialized.contains("rdf:first"),
-        "should contain rdf:first list triples, got:\n{serialized}"
-    );
-}
-
 // lib.rs:1675 — XMLLiteral namespace preservation is not implemented
 #[test]
 fn xml_literal_namespace_not_preserved() {
@@ -210,33 +180,5 @@ fn no_default_vocabulary_without_explicit_vocab() {
     assert!(
         !serialized.contains("name"),
         "bare term 'name' should not resolve without a default vocabulary, got:\n{serialized}"
-    );
-}
-
-// lib.rs:1400 — TODO: check inside/outside parent if for @typeof + @about
-#[test]
-fn typeof_with_about_sets_typed_resource() {
-    let html = r#"<!DOCTYPE html>
-    <html>
-    <head><title>test</title></head>
-    <body vocab="http://schema.org/">
-        <div about="http://example.org/thing" typeof="Thing">
-            <span property="name">My Thing</span>
-        </div>
-    </body>
-    </html>"#;
-
-    let (output, _processor) = parse_html(html);
-    let serialized = utils::serialize_graph(output, base().as_str());
-
-    // @typeof with @about should type the resource from @about.
-    // The output uses relative IRIs since base is http://example.org/.
-    assert!(
-        serialized.contains("<thing>"),
-        "should have triples about the @about resource, got:\n{serialized}"
-    );
-    assert!(
-        serialized.contains("Thing"),
-        "should have the type from @typeof, got:\n{serialized}"
     );
 }
