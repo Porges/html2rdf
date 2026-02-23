@@ -9,7 +9,7 @@ use oxrdf::{
     Graph, NamedNode, NamedNodeRef, NamedOrBlankNode, TermRef, TripleRef,
     vocab::{self, rdf},
 };
-use scraper::{ElementRef, Html};
+use scraper::{ElementRef, Html, node::Element};
 use tracing::trace;
 
 #[cfg(test)]
@@ -95,6 +95,9 @@ pub fn parse(
     output_graph: &mut Graph,
     processor_graph: &mut Graph,
 ) -> Result<(), Error> {
+    let o_graph = OutputGraph(output_graph);
+    let p_graph = ProcessorGraph(processor_graph);
+
     let get_err = || -> Result<(), Error> {
         let doc = Html::parse_document(input);
         if !doc.errors.is_empty() {
@@ -102,7 +105,7 @@ pub fn parse(
                 println!("Error: {}", err);
             }
         }
-        let mut proc = RDFaProcessor::new(output_graph, processor_graph);
+        let mut proc = RDFaProcessor::new(o_graph, p_graph);
 
         let base_sel = scraper::selector::Selector::parse("html>head>base").unwrap();
 
@@ -123,7 +126,7 @@ pub fn parse(
     }();
 
     if let Err(e) = get_err {
-        emit_processor(processor_graph, PGType::DocumentError, &e.to_string());
+        ProcessorGraph(processor_graph).emit(PGType::DocumentError, &e.to_string());
     }
 
     Ok(())
@@ -213,12 +216,12 @@ impl ListMapping {
 struct EvaluationContext {
     /// This is used to represent [_:], which is allowed in RDFa
     /// but not in Turtle.
-    empty_bnode: oxrdf::BlankNode,
+    empty_bnode: Rc<oxrdf::BlankNode>,
 
     // “The base. This will usually be the IRI of the document being processed,
     //  but it could be some other IRI, set by some other mechanism, such as the (X)HTML base element.
     //  The important thing is that it establishes an IRI against which relative paths can be resolved.
-    base: Iri<String>,
+    base: Rc<Iri<String>>,
 
     // “The parent subject. The initial value will be the same as the initial value of base,
     //  but it will usually change during the course of processing.
@@ -257,75 +260,233 @@ struct EvaluationContext {
 
 // “During the course of processing a number of locally scoped values are needed, as follows:
 #[derive(Clone)]
-struct LocalScope<'a> {
-    emit_warning: &'a dyn Fn(PGType, String),
-    eval_context: &'a EvaluationContext,
-    // “An initially empty list of IRI mappings, called the local list of IRI mappings.
-    iri_mappings: Rc<curie::PrefixMapping>,
-    // “An initially empty list of incomplete triples, called the local list of incomplete triples.
-    incomplete_triples: Vec<IncompleteTriple>,
-    // “An initially empty language value.
-    current_language: Option<Rc<LanguageIdentifier>>,
-    // “A skip element flag, which indicates whether the current element can safely be ignored
-    //  since it has no relevant RDFa attributes. Note that descendant elements will still be processed.
-    skip_element: bool,
-    // “A new subject value, which once calculated will set the parent subject in an evaluation context,
-    //  as well as being used to complete any incomplete triples, as described in the next section.
-    new_subject: Option<Rc<NamedOrBlankNode>>,
-    // “A value for the current object resource, the resource to use when creating triples that have a resource object.
-    current_object_resource: Option<Rc<NamedOrBlankNode>>,
-    // “A value for the typed resource, the source for creating rdf:type relationships to types specified in @typeof.
-    typed_resource: Option<Rc<NamedOrBlankNode>>,
-    // “The local term mappings, a list of terms and their associated IRIs.
-    term_mappings: Rc<BTreeMap<String, oxrdf::NamedNode>>,
-    // “The local list mapping, mapping IRIs to lists
-    list_mappings: Rc<RefCell<ListMapping>>,
+struct Resolver<'e, 'rp, 'p> {
+    el: &'e Element,
+    processor_graph: &'rp RefCell<ProcessorGraph<'p>>,
+    base: Rc<Iri<String>>,
+    empty_bnode: Rc<oxrdf::BlankNode>,
     // “A local default vocabulary, an IRI to use as a prefix mapping when a term is used.
     default_vocab: Option<oxrdf::NamedNode>,
+    // “The local term mappings, a list of terms and their associated IRIs.
+    term_mappings: Rc<BTreeMap<String, oxrdf::NamedNode>>,
+    // “An initially empty language value.
+    current_language: Option<Rc<LanguageIdentifier>>,
+    // “An initially empty list of IRI mappings, called the local list of IRI mappings.
+    iri_mappings: Rc<curie::PrefixMapping>,
 }
 
-enum CurieError {
-    EmptyCurie,
-    InvalidBlankNodeSuffix(String),
-    InvalidIRI(String),
-    ExpansionError(curie::ExpansionError),
-}
+impl<'e, 'rp, 'p: 'rp> Resolver<'e, 'rp, 'p> {
+    fn new(
+        eval_context: &EvaluationContext,
+        el: &'e Element,
+        host: impl HostLanguage,
+        output_graph: &mut OutputGraph,
+        processor_graph: &'rp RefCell<ProcessorGraph<'p>>,
+    ) -> Result<Self, Error> {
+        let base = eval_context.base.clone();
+        let empty_bnode = eval_context.empty_bnode.clone();
+        // [rdfa-core] 7.5: 2.
+        let default_vocab = Self::init_vocab(eval_context, el, &base, &host, output_graph);
+        // [rdfa-core] 7.5: 3.
+        let iri_mappings = Self::init_iri_mappings(eval_context, el)?;
+        // [rdfa-core] 7.5: 4.
+        let current_language = Self::init_current_language(eval_context, el, processor_graph);
 
-struct NotCURIE;
-struct NotTERM;
-
-impl<'b> LocalScope<'b> {
-    fn new(eval_context: &'b EvaluationContext, emit_warning: &'b dyn Fn(PGType, String)) -> Self {
-        // “First, the local values are initialized, as follows:
-        Self {
-            emit_warning,
-            eval_context,
-            // “the skip element flag is set to 'false';
-            skip_element: false,
-            // “new subject is set to null;
-            new_subject: None,
-            // “current object resource is set to null;
-            current_object_resource: None,
-            // “typed resource is set to null;
-            typed_resource: None,
-            // “the local list of IRI mappings is set to the list of IRI mappings from the evaluation context;
-            iri_mappings: eval_context.iri_mappings.clone(),
-            // “the local list of incomplete triples is set to null;
-            incomplete_triples: Default::default(),
-            // “the list mapping is set to (a reference of) the list mapping from the evaluation context;
-            list_mappings: eval_context.list_mapping.clone(),
-            // “the current language value is set to the language value from the evaluation context.
-            current_language: eval_context.language.clone(),
+        Ok(Self {
+            el,
+            base,
+            empty_bnode,
+            default_vocab,
+            processor_graph,
+            iri_mappings,
+            current_language,
             // “the local term mappings is set to the term mappings from the evaluation context.
             term_mappings: eval_context.term_mappings.clone(),
-            // “the local default vocabulary is set to the default vocabulary from the evaluation context.
-            default_vocab: eval_context.default_vocab.clone(),
+        })
+    }
+
+    /// Resolves an IRI against the [`Self::base`] value.
+    /// Note that unlike CURIEs, an empty IRI value is ignored.
+    fn resolve_relative_iri_against(
+        base: &Iri<String>,
+        value: &str,
+    ) -> Result<NamedNode, IriParseError> {
+        // [rdfa-core] 7.4.2 [NOTE]
+        // > Specifically, however, an empty attribute value is _never_ treated
+        // > as a relative IRI by this specification.
+        // if value.is_empty() {
+        //     return Ok(None);
+        // }
+
+        let iri = base.resolve(value)?;
+        debug_assert!(Iri::parse(iri.as_str()).is_ok());
+        Ok(oxrdf::NamedNode::new_unchecked(iri.into_inner()))
+    }
+
+    fn resolve_relative_iri(&self, value: &str) -> Result<NamedNode, IriParseError> {
+        Self::resolve_relative_iri_against(&self.base, value)
+    }
+
+    fn init_vocab(
+        eval_context: &EvaluationContext,
+        el: &Element,
+        base: &Iri<String>,
+        host: &dyn HostLanguage,
+        output_graph: &mut OutputGraph,
+    ) -> Option<oxrdf::NamedNode> {
+        // [rdfa-core] 7.5: 2.
+        // > Next the current element is examined for any change to the default vocabulary via @vocab.
+        if let Some(vocab) = el.attr("vocab") {
+            // > If the value is empty,
+            if vocab.is_empty() {
+                // then the local default vocabulary MUST be reset to the Host Language defined default (if any).
+                trace!("@vocab is empty, resetting default vocabulary to host language default");
+                return host.default_vocabulary();
+            }
+
+            // > If @vocab is present and contains a value,
+            if let Ok(vocab) = Self::resolve_relative_iri_against(base, vocab) {
+                // > the local default vocabulary is updated according to the
+                // > section on CURIE and IRI Processing.
+                trace!(vocabulary = %vocab, "default vocabulary set via @vocab");
+                // > The value of @vocab is used to generate a triple as follows:
+                output_graph.emit(TripleRef::new(
+                    // >   subject = base
+                    oxrdf::NamedNodeRef::new_unchecked(&eval_context.base),
+                    // >   predicate = http://www.w3.org/ns/rdfa#usesVocabulary
+                    rdfa_vocab::USES_VOCABULARY,
+                    // >   object = value from @vocab
+                    &vocab,
+                ));
+
+                return Some(vocab);
+            }
         }
+
+        // “the local default vocabulary is set to the default vocabulary from the evaluation context.
+        // NB - we do this in a different order than spec, to avoid cloning when we don't need to
+        eval_context.default_vocab.clone()
+    }
+
+    fn init_iri_mappings(
+        eval_context: &EvaluationContext,
+        el: &Element,
+    ) -> Result<Rc<curie::PrefixMapping>, Error> {
+        // 3.
+        // “Next, the current element is examined for IRI mappings and these are added to the local list of IRI mappings.
+        //  Note that an IRI mapping will simply overwrite any current mapping in the list that has the same name;
+        //
+        // [HTML-RDFA]
+        // “Extracting URI Mappings declared via @xmlns: while operating from within a DOM Level 2 based RDFa processor
+        //  can be achieved using the following algorithm:
+        // “While processing each DOM2 [Element] as described in [rdfa-core], Section 7.5: Sequence, Step #2:
+        // “1. For each [Attr] in the [Node.attributes] list that has a [namespace prefix] value of @xmlns,
+        //     create an [IRI mapping] by storing the [local name] as the value to be mapped, and the
+        //     [Node.nodeValue] as the value to map.
+        // (Note: this is not done because html5ever/scraper never reports namespace prefixes…)
+        // “2. For each [Attr] in the [Node.attributes] list that has a [namespace prefix] value of null
+        //     and a [local name] that starts with @xmlns:, create an [IRI mapping] by storing the [local name]
+        //     part with the @xmlns: characters removed as the value to be mapped, and the [Node.nodeValue] as
+        //     the value to map.
+        // (Note: this is what is implemented below…)
+        let xmlns_prefixes = el
+            .attrs
+            .iter()
+            .filter_map(|(qn, value)| -> Option<_> {
+                if qn.prefix.is_none() {
+                    let prefix = qn.local.strip_prefix("xmlns:")?;
+                    Some((prefix, value))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let prefixes = el
+            .attr("prefix")
+            .map(|x| {
+                x.split_ascii_whitespace()
+                    .tuples()
+                    .map(|(prefix, value)| {
+                        if let Some(prefix) = prefix.strip_suffix(':') {
+                            Ok((prefix, value))
+                        } else {
+                            Err(Error::NoColonPrefix)
+                        }
+                    })
+                    .collect::<Result<Vec<_>, Error>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+
+        if !xmlns_prefixes.is_empty() || !prefixes.is_empty() {
+            let mut mappings = eval_context.iri_mappings.as_ref().clone();
+            // note that we do not ever set_default,
+            // this would define a "no prefix" mapping
+            // which is MUST NOT in RDFa
+
+            // add XMLNS (must be first)
+            for (prefix, iri) in xmlns_prefixes {
+                mappings.add_prefix(prefix, iri).expect("TODO");
+            }
+
+            // add others (after XMLNS)
+            for (prefix, iri) in prefixes {
+                mappings.add_prefix(prefix, iri).expect("TODO");
+            }
+
+            Ok(Rc::new(mappings))
+        } else {
+            // “the local list of IRI mappings is set to the list of IRI mappings from the evaluation context;
+            // NB: we do this in a different order
+            Ok(eval_context.iri_mappings.clone())
+        }
+    }
+
+    fn init_current_language(
+        eval_context: &EvaluationContext,
+        el: &Element,
+        processor_graph: &'rp RefCell<ProcessorGraph<'p>>,
+    ) -> Option<Rc<LanguageIdentifier>> {
+        // 4. Language
+        // “The current element is also parsed for any language information,
+        //  and if present, current language is set accordingly;
+        //
+        // [HTML-RDFA] 3.1
+        // “The current language can be set using either the @lang
+        //  or @xml:lang attributes. When the @lang attribute and
+        //  the @xml:lang attribute are specified on the same element,
+        //  the @xml:lang attribute takes precedence. When both @lang
+        //  and @xml:lang are specified on the same element, they MUST
+        //  have the same value. Further details related to setting the
+        //  current language can be found in section 3.3 Specifying the
+        //  Language for a Literal.
+        if let Some(lang) = el.attr("xml:lang").or(el.attr("lang")) {
+            if lang.is_empty() {
+                return None;
+            } else {
+                match LanguageIdentifier::from_str(lang) {
+                    Ok(lang) => {
+                        trace!(current_language = %lang, "current language set");
+                        return Some(Rc::new(lang));
+                    }
+                    Err(e) => {
+                        processor_graph.borrow_mut().emit(
+                            PGType::Warning,
+                            &format!("Invalid language identifier ({lang}): {e}"),
+                        );
+                    }
+                }
+            }
+        }
+
+        // “the current language value is set to the language value from the evaluation context.
+        eval_context.language.clone()
     }
 
     /// An empty CURIE resolves to the [`Self::base`] value.
     fn empty_curie(&self) -> oxrdf::NamedNodeRef<'_> {
-        oxrdf::NamedNodeRef::new_unchecked(self.eval_context.base.as_str())
+        oxrdf::NamedNodeRef::new_unchecked(self.base.as_str())
     }
 
     // When resolving a term, the outcome might be that it _must_ be ignored.
@@ -397,7 +558,7 @@ impl<'b> LocalScope<'b> {
                     // [_:] is permitted by RDFa but it is not allowed by oxrdf
                     // since the Turtle syntax does not permit it. So, we turn
                     // all references to [_:] into a single (randomized) blank node.
-                    return Ok(self.eval_context.empty_bnode.clone().into());
+                    return Ok(self.empty_bnode.as_ref().clone().into());
                 }
 
                 return Ok(oxrdf::BlankNode::new(suffix)
@@ -437,25 +598,25 @@ impl<'b> LocalScope<'b> {
                         CurieError::EmptyCurie
                         | CurieError::ExpansionError(ExpansionError::MissingDefault) => {}
                         CurieError::InvalidBlankNodeSuffix(suffix) => {
-                            (self.emit_warning)(
+                            self.processor_graph.borrow_mut().emit(
                                 PGType::UnresolvedCurie,
-                                format!(
+                                &format!(
                                     "Invalid CURIE: {value} (invalid blank node suffix: `{suffix}`)",
                                 ),
                             );
                         }
                         CurieError::InvalidIRI(iri) => {
-                            (self.emit_warning)(
+                            self.processor_graph.borrow_mut().emit(
                                 PGType::UnresolvedCurie,
-                                format!(
+                                &format!(
                                     "Invalid CURIE: {value} (expanded to invalid IRI value <{iri}>)",
                                 ),
                             );
                         }
                         CurieError::ExpansionError(ExpansionError::Invalid) => {
-                            (self.emit_warning)(
+                            self.processor_graph.borrow_mut().emit(
                                 PGType::UnresolvedCurie,
-                                format!("Invalid CURIE: {value} (no such prefix defined)"),
+                                &format!("Invalid CURIE: {value} (no such prefix defined)"),
                             );
                         }
                     }
@@ -473,21 +634,6 @@ impl<'b> LocalScope<'b> {
     /// Resolves an IRI-only attribute value.
     fn attribute_iri(&self, value: &str) -> Option<NamedNode> {
         self.resolve_relative_iri(value).ok()
-    }
-
-    /// Resolves an IRI against the [`Self::base`] value.
-    /// Note that unlike CURIEs, an empty IRI value is ignored.
-    fn resolve_relative_iri(&self, value: &str) -> Result<NamedNode, IriParseError> {
-        // [rdfa-core] 7.4.2 [NOTE]
-        // > Specifically, however, an empty attribute value is _never_ treated
-        // > as a relative IRI by this specification.
-        // if value.is_empty() {
-        //     return Ok(None);
-        // }
-
-        let iri = self.eval_context.base.resolve(value)?;
-        debug_assert!(Iri::parse(iri.as_str()).is_ok());
-        Ok(oxrdf::NamedNode::new_unchecked(iri.into_inner()))
     }
 
     /// Resolves an absolute IRI.
@@ -526,9 +672,9 @@ impl<'b> LocalScope<'b> {
     }
 
     fn report_invalid_iri(&self, iri_err: IriParseError, value: &str) {
-        (self.emit_warning)(
+        self.processor_graph.borrow_mut().emit(
             PGType::Warning,
-            format!("Invalid IRI: <{}> ({})", value, iri_err),
+            &format!("Invalid IRI: <{}> ({})", value, iri_err),
         );
     }
 
@@ -561,6 +707,56 @@ impl<'b> LocalScope<'b> {
     }
 }
 
+#[derive(Clone)]
+struct LocalScope<'a> {
+    eval_context: &'a EvaluationContext,
+    // “An initially empty list of incomplete triples, called the local list of incomplete triples.
+    incomplete_triples: Vec<IncompleteTriple>,
+    // “A skip element flag, which indicates whether the current element can safely be ignored
+    //  since it has no relevant RDFa attributes. Note that descendant elements will still be processed.
+    skip_element: bool,
+    // “A new subject value, which once calculated will set the parent subject in an evaluation context,
+    //  as well as being used to complete any incomplete triples, as described in the next section.
+    new_subject: Option<Rc<NamedOrBlankNode>>,
+    // “A value for the current object resource, the resource to use when creating triples that have a resource object.
+    current_object_resource: Option<Rc<NamedOrBlankNode>>,
+    // “A value for the typed resource, the source for creating rdf:type relationships to types specified in @typeof.
+    typed_resource: Option<Rc<NamedOrBlankNode>>,
+    // “The local list mapping, mapping IRIs to lists
+    list_mappings: Rc<RefCell<ListMapping>>,
+}
+
+enum CurieError {
+    EmptyCurie,
+    InvalidBlankNodeSuffix(String),
+    InvalidIRI(String),
+    ExpansionError(curie::ExpansionError),
+}
+
+struct NotCURIE;
+struct NotTERM;
+
+impl<'b> LocalScope<'b> {
+    fn new(eval_context: &'b EvaluationContext) -> Self {
+        // “First, the local values are initialized, as follows:
+        Self {
+            eval_context,
+            // “the skip element flag is set to 'false';
+            skip_element: false,
+            // “new subject is set to null;
+            new_subject: None,
+            // “current object resource is set to null;
+            current_object_resource: None,
+            // “typed resource is set to null;
+            typed_resource: None,
+            // “the local list of incomplete triples is set to null;
+            incomplete_triples: Default::default(),
+            // “the list mapping is set to (a reference of) the list mapping from the evaluation context;
+            list_mappings: eval_context.list_mapping.clone(),
+        }
+    }
+}
+
 enum Relation {
     Forward(oxrdf::NamedNode),
     Reverse(oxrdf::NamedNode),
@@ -584,10 +780,10 @@ impl EvaluationContext {
 
         Self {
             // generate a random blank node for the empty blank node value
-            empty_bnode: oxrdf::BlankNode::default(),
+            empty_bnode: Rc::new(oxrdf::BlankNode::default()),
             // resolve the base to remove any fragments
             // so that we can use it directly as the "empty CURIE" value
-            base: base.resolve("").unwrap(),
+            base: Rc::new(base.resolve("").unwrap()),
             parent_subject: Rc::new(oxrdf::NamedNode::new_unchecked(base.into_inner()).into()),
             term_mappings,
             parent_object: None,
@@ -666,8 +862,37 @@ mod rdfa_vocab {
 }
 
 struct RDFaProcessor<'o, 'p> {
-    output_graph: RefCell<&'o mut oxrdf::Graph>,
-    processor_graph: RefCell<&'p mut oxrdf::Graph>,
+    output: RefCell<OutputGraph<'o>>,
+    processor: RefCell<ProcessorGraph<'p>>,
+}
+
+struct OutputGraph<'o>(&'o mut oxrdf::Graph);
+struct ProcessorGraph<'p>(&'p mut oxrdf::Graph);
+
+impl<'o> OutputGraph<'o> {
+    fn emit(&mut self, tr: TripleRef) {
+        trace!(triple = %tr, "emitting output triple");
+        self.0.insert(tr);
+    }
+}
+
+impl<'p> ProcessorGraph<'p> {
+    fn emit(&mut self, pg_type: PGType, msg: &str) {
+        let warning_subj: oxrdf::NamedOrBlankNode = oxrdf::BlankNode::default().into();
+        let pg_type: oxrdf::NamedNodeRef = pg_type.into();
+        // new bnode is-a PGClass
+        let node = TripleRef::new(&warning_subj, oxrdf::vocab::rdf::TYPE, pg_type);
+        // add description
+        let desc = TripleRef::new(
+            &warning_subj,
+            dc_vocab::DESCRIPTION,
+            oxrdf::LiteralRef::new_simple_literal(msg),
+        );
+        trace!(triple = %node, "emitting processor triple (type)");
+        self.0.insert(node);
+        trace!(triple = %desc, "emitting processor triple (description)");
+        self.0.insert(desc);
+    }
 }
 
 enum PGType {
@@ -822,28 +1047,11 @@ impl HostLanguage for &XHTMLHost {
     }
 }
 
-fn emit_processor(pg: &mut Graph, pg_type: PGType, msg: &str) {
-    let warning_subj: oxrdf::NamedOrBlankNode = oxrdf::BlankNode::default().into();
-    let pg_type: oxrdf::NamedNodeRef = pg_type.into();
-    // new bnode is-a PGClass
-    let node = TripleRef::new(&warning_subj, oxrdf::vocab::rdf::TYPE, pg_type);
-    // add description
-    let desc = TripleRef::new(
-        &warning_subj,
-        dc_vocab::DESCRIPTION,
-        oxrdf::LiteralRef::new_simple_literal(msg),
-    );
-    trace!(triple = %node, "emitting processor triple");
-    pg.insert(node);
-    trace!(triple = %desc, "emitting processor triple");
-    pg.insert(desc);
-}
-
 impl<'o, 'p> RDFaProcessor<'o, 'p> {
-    fn new(output_graph: &'o mut oxrdf::Graph, processor_graph: &'p mut oxrdf::Graph) -> Self {
+    fn new(output_graph: OutputGraph<'o>, processor_graph: ProcessorGraph<'p>) -> Self {
         Self {
-            output_graph: RefCell::new(output_graph),
-            processor_graph: RefCell::new(processor_graph),
+            output: RefCell::new(output_graph),
+            processor: RefCell::new(processor_graph),
         }
     }
 
@@ -900,15 +1108,23 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                             let mut next: NamedOrBlankNode = vocab::rdf::NIL.into();
                             for item in list.borrow().iter().rev() {
                                 let me = oxrdf::BlankNode::default();
-                                self.emit_output(TripleRef::new(
+                                self.output.get_mut().emit(TripleRef::new(
                                     &me,
                                     vocab::rdf::FIRST,
                                     item.as_ref(),
                                 ));
-                                self.emit_output(TripleRef::new(&me, vocab::rdf::REST, &next));
+                                self.output.get_mut().emit(TripleRef::new(
+                                    &me,
+                                    vocab::rdf::REST,
+                                    &next,
+                                ));
                                 next = me.into();
                             }
-                            self.emit_output(TripleRef::new(subject.as_ref(), iri, &next));
+                            self.output.get_mut().emit(TripleRef::new(
+                                subject.as_ref(),
+                                iri,
+                                &next,
+                            ));
                         }
                     }
                 }
@@ -916,11 +1132,6 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         }
 
         Ok(())
-    }
-
-    fn emit_output(&self, tr: TripleRef) {
-        trace!(triple = %tr, "emitting output triple");
-        self.output_graph.borrow_mut().insert(tr);
     }
 
     // TOD: implement https://www.w3.org/TR/html-rdfa/#h-additional-rules
@@ -932,11 +1143,6 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         host: impl HostLanguage,
     ) -> Result<EvaluationContext, Error> {
         trace!(element = ?element, "processing element");
-
-        let emit_warning = |pgtype: PGType, msg: String| {
-            let mut pg = self.processor_graph.borrow_mut();
-            emit_processor(&mut pg, pgtype, &msg);
-        };
 
         let el = element.value();
 
@@ -970,7 +1176,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                 Some(v) => {
                     match proj(v)
                         .into_iter()
-                        .filter_map(|v| self.to_predicate(name, v))
+                        .filter_map(|v| Self::to_predicate(name, v))
                         .try_collect1()
                     {
                         Err(_) => Attr::Empty,
@@ -1005,137 +1211,19 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         let is_root_element = el.name() == "html";
         debug_assert!(is_root_element == eval_context.parent_object.is_none());
 
+        let resolver = Resolver::new(
+            eval_context,
+            el,
+            host,
+            self.output.get_mut(),
+            &self.processor,
+        )?;
+
         // 1.
-        let mut local = LocalScope::new(eval_context, &emit_warning);
-
-        // [rdfa-core] 7.5: 2.
-        // > Next the current element is examined for any change to the default vocabulary via @vocab.
-        if let Some(vocab) = el.attr("vocab") {
-            if vocab.is_empty() {
-                trace!("@vocab is empty, resetting default vocabulary to host language default");
-                // > If the value is empty, then the local default vocabulary
-                // > MUST be reset to the Host Language defined default (if any).
-                local.default_vocab = host.default_vocabulary();
-            }
-            // > If @vocab is present and contains a value,
-            else if let Ok(vocab) = local.resolve_relative_iri(vocab) {
-                trace!(vocabulary = %vocab, "default vocabulary set via @vocab");
-                // > the local default vocabulary is updated according to the
-                // > section on CURIE and IRI Processing.
-                //
-                // > The value of @vocab is used to generate a triple as follows:
-                self.emit_output(TripleRef::new(
-                    // >   subject = base
-                    oxrdf::NamedNodeRef::new_unchecked(&eval_context.base),
-                    // >   predicate = http://www.w3.org/ns/rdfa#usesVocabulary
-                    rdfa_vocab::USES_VOCABULARY,
-                    // >   object = value from @vocab
-                    &vocab,
-                ));
-                local.default_vocab = Some(vocab);
-            }
-        }
-
-        // 3.
-        // “Next, the current element is examined for IRI mappings and these are added to the local list of IRI mappings.
-        //  Note that an IRI mapping will simply overwrite any current mapping in the list that has the same name;
-        //
-        // [HTML-RDFA]
-        // “Extracting URI Mappings declared via @xmlns: while operating from within a DOM Level 2 based RDFa processor
-        //  can be achieved using the following algorithm:
-        // “While processing each DOM2 [Element] as described in [rdfa-core], Section 7.5: Sequence, Step #2:
-        // “1. For each [Attr] in the [Node.attributes] list that has a [namespace prefix] value of @xmlns,
-        //     create an [IRI mapping] by storing the [local name] as the value to be mapped, and the
-        //     [Node.nodeValue] as the value to map.
-        // (Note: this is not done because html5ever/scraper never reports namespace prefixes…)
-        // “2. For each [Attr] in the [Node.attributes] list that has a [namespace prefix] value of null
-        //     and a [local name] that starts with @xmlns:, create an [IRI mapping] by storing the [local name]
-        //     part with the @xmlns: characters removed as the value to be mapped, and the [Node.nodeValue] as
-        //     the value to map.
-        // (Note: this is what is implemented below…)
-        let xmlns_prefixes = el
-            .attrs
-            .iter()
-            .filter_map(|(qn, value)| -> Option<_> {
-                if qn.prefix.is_none() {
-                    let prefix = qn.local.strip_prefix("xmlns:")?;
-                    Some((prefix, value))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let prefixes = el
-            .attr("prefix")
-            .map(|x| {
-                x.split_ascii_whitespace()
-                    .tuples()
-                    .map(|(prefix, value)| {
-                        if let Some(prefix) = prefix.strip_suffix(':') {
-                            Ok((prefix, value))
-                        } else {
-                            Err(Error::NoColonPrefix)
-                        }
-                    })
-                    .collect::<Result<Vec<_>, Error>>()
-            })
-            .transpose()?
-            .unwrap_or_default();
-
-        if !xmlns_prefixes.is_empty() || !prefixes.is_empty() {
-            let mut mappings = Rc::unwrap_or_clone(local.iri_mappings);
-            // note that we do not ever set_default,
-            // this would define a "no prefix" mapping
-            // which is MUST NOT in RDFa
-
-            // add XMLNS (must be first)
-            for (prefix, iri) in xmlns_prefixes {
-                mappings.add_prefix(prefix, iri).expect("TODO");
-            }
-
-            // add others (after XMLNS)
-            for (prefix, iri) in prefixes {
-                mappings.add_prefix(prefix, iri).expect("TODO");
-            }
-
-            local.iri_mappings = Rc::new(mappings);
-        }
-
-        // 4. Language
-        // “The current element is also parsed for any language information,
-        //  and if present, current language is set accordingly;
-        //
-        // [HTML-RDFA] 3.1
-        // “The current language can be set using either the @lang
-        //  or @xml:lang attributes. When the @lang attribute and
-        //  the @xml:lang attribute are specified on the same element,
-        //  the @xml:lang attribute takes precedence. When both @lang
-        //  and @xml:lang are specified on the same element, they MUST
-        //  have the same value. Further details related to setting the
-        //  current language can be found in section 3.3 Specifying the
-        //  Language for a Literal.
-        if let Some(lang) = el.attr("xml:lang").or(el.attr("lang")) {
-            if lang.is_empty() {
-                local.current_language = None;
-            } else {
-                match LanguageIdentifier::from_str(lang) {
-                    Ok(lang) => {
-                        trace!(current_language = %lang, "current language set");
-                        local.current_language = Some(Rc::new(lang));
-                    }
-                    Err(e) => {
-                        (emit_warning)(
-                            PGType::Warning,
-                            format!("Invalid language identifier ({lang}): {e}"),
-                        );
-                    }
-                }
-            }
-        }
+        let mut local = LocalScope::new(eval_context);
 
         let property: Attr<Vec1<oxrdf::NamedNode>> =
-            attr_many_pred("property", &|v| local.many_term_or_curie_or_absiri(v));
+            attr_many_pred("property", &|v| resolver.many_term_or_curie_or_absiri(v));
 
         let inlist = el.attr("inlist").is_some();
         let rel: Option<Vec<Relation>>;
@@ -1154,21 +1242,21 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             // > on the same element, the non-CURIE and non-URI @rel and @rev values
             // > are ignored. If, after this, the value of @rel and/or @rev becomes empty,
             // > then the processor MUST act as if the respective attribute is not present.
-            rel = match attr_many_pred("rel", &|v| local.many_curie_or_absiri(v)) {
+            rel = match attr_many_pred("rel", &|v| resolver.many_curie_or_absiri(v)) {
                 Attr::Missing | Attr::Empty => None,
                 Attr::Value(v) => Some(v.into_iter().map(rel_dir).collect()),
             };
-            rev = match attr_many_pred("rev", &|v| local.many_curie_or_absiri(v)) {
+            rev = match attr_many_pred("rev", &|v| resolver.many_curie_or_absiri(v)) {
                 Attr::Missing | Attr::Empty => None,
                 Attr::Value(v) => Some(v.into_iter().map(rev_dir).collect()),
             };
         } else {
-            rel = match attr_many_pred("rel", &|v| local.many_term_or_curie_or_absiri(v)) {
+            rel = match attr_many_pred("rel", &|v| resolver.many_term_or_curie_or_absiri(v)) {
                 Attr::Missing => None,
                 Attr::Empty => Some(Vec::new()),
                 Attr::Value(v) => Some(v.into_iter().map(rel_dir).collect()),
             };
-            rev = match attr_many_pred("rev", &|v| local.many_term_or_curie_or_absiri(v)) {
+            rev = match attr_many_pred("rev", &|v| resolver.many_term_or_curie_or_absiri(v)) {
                 Attr::Missing => None,
                 Attr::Empty => Some(Vec::new()),
                 Attr::Value(v) => Some(v.into_iter().map(rev_dir).collect()),
@@ -1210,11 +1298,11 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             // > subject and predicate defined above. An RDFa Processor MUST behave
             // > as if there is an in-scope vocabulary of http://www.w3.org/1999/xhtml/vocab# for
             // > the value(s) of the @role attribute.
-            let role_local = LocalScope {
+            let role_local = Resolver {
                 default_vocab: Some(oxrdf::NamedNode::new_unchecked(
                     "http://www.w3.org/1999/xhtml/vocab#".to_string(),
                 )),
-                ..local.clone()
+                ..resolver.clone()
             };
 
             // > Remember that @role values are defined using the datatype TERMorCURIEorAbsIRIs.
@@ -1223,25 +1311,27 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             for role in role_local.many_term_or_curie_or_absiri(role) {
                 // > The predicate is the term `role` in the vocabulary
                 // > defined at http://www.w3.org/1999/xhtml/vocab.
-                self.emit_output(TripleRef::new(&role_subject, xhv_vocab::ROLE, &role));
+                self.output
+                    .get_mut()
+                    .emit(TripleRef::new(&role_subject, xhv_vocab::ROLE, &role));
             }
         }
 
         let content = el.attr("content");
 
         let type_of: Attr<Vec1<NamedOrBlankNode>> =
-            attr_many("typeof", &|v| local.many_term_or_curie_or_absiri(v));
+            attr_many("typeof", &|v| resolver.many_term_or_curie_or_absiri(v));
 
         let about: Attr<Rc<NamedOrBlankNode>> =
-            attr1("about", &|v| local.safecuri_or_curie_or_iri(v)).map(Rc::new);
+            attr1("about", &|v| resolver.safecuri_or_curie_or_iri(v)).map(Rc::new);
         let resource: Attr<Rc<NamedOrBlankNode>> =
-            attr1("resource", &|x| local.safecuri_or_curie_or_iri(x)).map(Rc::new);
+            attr1("resource", &|x| resolver.safecuri_or_curie_or_iri(x)).map(Rc::new);
 
-        let href: Attr<NamedNode> = attr_iri("href", &|v| local.attribute_iri(v));
-        let src: Attr<NamedNode> = attr_iri("src", &|v| local.attribute_iri(v));
+        let href: Attr<NamedNode> = attr_iri("href", &|v| resolver.attribute_iri(v));
+        let src: Attr<NamedNode> = attr_iri("src", &|v| resolver.attribute_iri(v));
 
         let datatype: Attr<oxrdf::NamedOrBlankNode> =
-            attr1("datatype", &|v| local.term_or_curie_or_absiri(v));
+            attr1("datatype", &|v| resolver.term_or_curie_or_absiri(v));
 
         // read from the "resource attributes"
         let resource_present = resource.is_present() || href.is_present() || src.is_present();
@@ -1273,7 +1363,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                 else if is_root_element {
                     //  then act as if there is an empty @about present,
                     //  and process it according to the rule for @about, above;
-                    let new_subject = Rc::new(local.empty_curie().into());
+                    let new_subject = Rc::new(resolver.empty_curie().into());
                     trace!(new_subject = %new_subject, "using empty @about as new subject");
                     local.new_subject = Some(new_subject);
                 }
@@ -1296,7 +1386,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                     else if is_root_element {
                         // “then act as if there is an empty @about present
                         //  and process it according to the previous rule;
-                        local.typed_resource = Some(Rc::new(local.empty_curie().into()));
+                        local.typed_resource = Some(Rc::new(resolver.empty_curie().into()));
                     }
                     // “otherwise,
                     else {
@@ -1362,7 +1452,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                     if is_root_element {
                         // > then act as if there is an empty @about present,
                         // > and process it according to the rule for @about, above;
-                        let new_subject = Rc::new(local.empty_curie().into());
+                        let new_subject = Rc::new(resolver.empty_curie().into());
                         trace!(new_subject = %new_subject, "[root element] using empty CURIE as new subject");
                         local.new_subject = Some(new_subject);
                     }
@@ -1422,7 +1512,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                 if is_root_element {
                     // “then act as if there is an empty @about present,
                     //  and process it according to the rule for @about, above;
-                    let new_subject = Rc::new(local.empty_curie().into());
+                    let new_subject = Rc::new(resolver.empty_curie().into());
                     trace!(new_subject = %new_subject, "using empty CURIE as new subject (root element)");
                     local.new_subject = Some(new_subject);
                 } else if let Some(parent_obj) = &eval_context.parent_object {
@@ -1475,7 +1565,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
             //  a triple as follows:
             if let Some(type_of) = type_of.value() {
                 for type_iri in type_of {
-                    self.emit_output(TripleRef::new(
+                    self.output.get_mut().emit(TripleRef::new(
                         // subject = typed resource
                         typed_resource,
                         // predicate = http://www.w3.org/1999/02/22-rdf-syntax-ns#type
@@ -1528,7 +1618,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                         // > to the section on CURIE and IRI Processing each of which is used to
                         // > generate a triple as follows:
                         Relation::Forward(predicate) => {
-                            self.emit_output(TripleRef::new(
+                            self.output.get_mut().emit(TripleRef::new(
                                 //  subject = new subject
                                 local.new_subject.as_deref().unwrap(),
                                 //  predicate = full IRI
@@ -1541,7 +1631,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                             // “If present, @rev may contain one or more resources,
                             //  obtained according to the section on CURIE and IRI Processing
                             // each of which is used to generate a triple as follows:
-                            self.emit_output(TripleRef::new(
+                            self.output.get_mut().emit(TripleRef::new(
                                 //  subject = current object resource
                                 current_object_resource.as_ref(),
                                 //  predicate = full IRI
@@ -1607,7 +1697,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         //  If present, one or more resources are obtained according to the section on
         //  CURIE and IRI Processing, and then the actual literal value is obtained as follows:
         if let Some(properties) = property.into_value() {
-            let lang = local.current_language.as_ref().map(|l| l.to_string());
+            let lang = resolver.current_language.as_ref().map(|l| l.to_string());
             let mut otherwise_datatype: Option<NamedNodeRef> = None;
             let content_val: Cow<str> = if let Some(content) = content {
                 content.into()
@@ -1721,8 +1811,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                         oxrdf::LiteralRef::new_typed_literal(&content_val, datatype).into()
                     }
                 }
-                Attr::Value(NamedOrBlankNode::BlankNode(_blank_node)) => todo!(),
-                Attr::Missing => {
+                Attr::Value(NamedOrBlankNode::BlankNode(_)) | Attr::Missing => {
                     if let Some(otherwise_datatype) = otherwise_datatype {
                         // [html-rdfa] extension #9
                         // “Otherwise, if the value of @datetime lexically matches a valid xsd:date, xsd:time,
@@ -1791,7 +1880,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                 // “Otherwise the current property value is used to generate a triple as follows:
                 if let Some(sub) = local.new_subject.as_deref() {
                     for property in properties {
-                        self.emit_output(TripleRef::new(
+                        self.output.get_mut().emit(TripleRef::new(
                             // subject = new subject
                             sub,
                             // predicate = full IRI
@@ -1829,7 +1918,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                         .push(Rc::new(new_subject.as_ref().clone().into())),
                     // “If direction is 'forward' then the following triple is generated:
                     IncompleteTriple::Forward(predicate) => {
-                        self.emit_output(TripleRef::new(
+                        self.output.get_mut().emit(TripleRef::new(
                             // subject = parent subject
                             eval_context.parent_subject.as_ref(),
                             // predicate = the predicate from the iterated incomplete triple
@@ -1840,7 +1929,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                     }
                     // “If direction is 'reverse' then this is the triple generated:
                     IncompleteTriple::Reverse(predicate) => {
-                        self.emit_output(TripleRef::new(
+                        self.output.get_mut().emit(TripleRef::new(
                             // subject = new subject
                             new_subject.as_ref(),
                             // predicate = the predicate from the iterated incomplete triple
@@ -1862,19 +1951,20 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
         //  mappings values replaced with the local values;
         if local.skip_element {
             Ok(EvaluationContext {
-                language: local.current_language,
-                iri_mappings: local.iri_mappings,
+                language: resolver.current_language,
+                iri_mappings: resolver.iri_mappings,
                 // ERRATA: this also needs to be copied
-                default_vocab: local.default_vocab,
+                default_vocab: resolver.default_vocab,
+                // TODO(ERRATA): should the term mappings also be copied here?
                 ..eval_context.clone()
             })
         } else {
             // “ Otherwise, the values are:
             Ok(EvaluationContext {
                 // internal
-                empty_bnode: eval_context.empty_bnode.clone(),
+                empty_bnode: resolver.empty_bnode,
                 // > the base is set to the base value of the current evaluation context;
-                base: eval_context.base.clone(),
+                base: resolver.base,
                 // “ the parent subject is set to the value of new subject, if non-null,
                 //   or the value of the parent subject of the current evaluation context;
                 parent_subject: local
@@ -1893,31 +1983,31 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                         .unwrap_or_else(|| eval_context.parent_subject.clone()),
                 ),
                 // “ the list of IRI mappings is set to the local list of IRI mappings;
-                iri_mappings: local.iri_mappings,
+                iri_mappings: resolver.iri_mappings,
                 // “ the list of incomplete triples is set to the local list of incomplete triples;
                 incomplete_triples: local.incomplete_triples,
                 // “ the list mapping is set to the local list mapping;
                 list_mapping: local.list_mappings,
                 // “ language is set to the value of current language.
-                language: local.current_language,
+                language: resolver.current_language,
                 // “ the default vocabulary is set to the value of the local default vocabulary.
-                default_vocab: local.default_vocab,
+                default_vocab: resolver.default_vocab,
                 // ERRATA: undocumented, but assumed
-                term_mappings: local.term_mappings,
+                term_mappings: resolver.term_mappings,
             })
         }
     }
 
-    fn to_predicate(&self, name: &str, v: NamedOrBlankNode) -> Option<oxrdf::NamedNode> {
+    fn to_predicate(name: &str, v: NamedOrBlankNode) -> Option<oxrdf::NamedNode> {
         match v {
             NamedOrBlankNode::NamedNode(x) => Some(x),
             NamedOrBlankNode::BlankNode(b) => {
-                let mut pg = self.processor_graph.borrow_mut();
-                emit_processor(
-                    &mut pg,
+                /*
+                self.processor.borrow_mut().emit(
                     PGType::Warning,
                     &format!("@{} cannot refer to a bnode: [{}]", name, b),
                 );
+                */
                 None
             }
         }
