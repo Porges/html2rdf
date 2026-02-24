@@ -27,64 +27,68 @@ pub fn process(
 }
 
 fn property_copying(graph: &mut Graph) {
-    let mut added_any = true;
-    while added_any {
-        added_any = false;
+    // Step 1: add
+    {
+        let mut added_any = true;
+        let mut new_triples = Vec::new();
+        while added_any {
+            new_triples.clear();
+            added_any = false;
 
-        let mut new_triples = Graph::new();
+            for copy_triple in graph.triples_for_predicate(rdfa_vocab::COPY) {
+                let copy_target: oxrdf::NamedOrBlankNodeRef = match copy_triple.object {
+                    TermRef::NamedNode(n) => n.into(),
+                    TermRef::BlankNode(n) => n.into(),
+                    TermRef::Literal(_) => {
+                        continue; // TODO: warning?
+                    }
+                };
+
+                if !graph.contains(TripleRef::new(copy_target, rdf::TYPE, rdfa_vocab::PATTERN)) {
+                    continue; // TODO: warning?
+                }
+
+                for trip in graph.triples_for_subject(copy_target) {
+                    new_triples.push(
+                        TripleRef::new(copy_triple.subject, trip.predicate, trip.object)
+                            .into_owned(),
+                    );
+                }
+            }
+
+            for triple in &new_triples {
+                added_any |= graph.insert(triple);
+            }
+        }
+    }
+
+    // Step 2: remove
+    {
+        let mut triples_to_remove = Vec::new();
         for copy_triple in graph.triples_for_predicate(rdfa_vocab::COPY) {
+            triples_to_remove.push(copy_triple.into_owned());
             let copy_target: oxrdf::NamedOrBlankNodeRef = match copy_triple.object {
                 TermRef::NamedNode(n) => n.into(),
                 TermRef::BlankNode(n) => n.into(),
-                TermRef::Literal(_) => {
-                    continue; // TODO: warning?
-                }
+                TermRef::Literal(_) => continue,
             };
 
             if !graph.contains(TripleRef::new(copy_target, rdf::TYPE, rdfa_vocab::PATTERN)) {
-                continue; // TODO: warning?
+                continue;
             }
+
+            triples_to_remove.push(
+                TripleRef::new(copy_triple.subject, rdf::TYPE, rdfa_vocab::PATTERN).into_owned(),
+            );
 
             for trip in graph.triples_for_subject(copy_target) {
-                new_triples.insert(TripleRef::new(
-                    copy_triple.subject,
-                    trip.predicate,
-                    trip.object,
-                ));
+                triples_to_remove.push(trip.into_owned());
             }
         }
 
-        for triple in new_triples.iter() {
-            added_any |= graph.insert(triple);
+        for triple in triples_to_remove {
+            graph.remove(&triple);
         }
-    }
-
-    let mut triples_to_remove = Graph::new();
-    for copy_triple in graph.triples_for_predicate(rdfa_vocab::COPY) {
-        triples_to_remove.insert(copy_triple);
-        let copy_target: oxrdf::NamedOrBlankNodeRef = match copy_triple.object {
-            TermRef::NamedNode(n) => n.into(),
-            TermRef::BlankNode(n) => n.into(),
-            TermRef::Literal(_) => continue,
-        };
-
-        if !graph.contains(TripleRef::new(copy_target, rdf::TYPE, rdfa_vocab::PATTERN)) {
-            continue;
-        }
-
-        triples_to_remove.insert(TripleRef::new(
-            copy_triple.subject,
-            rdf::TYPE,
-            rdfa_vocab::PATTERN,
-        ));
-
-        for trip in graph.triples_for_subject(copy_target) {
-            triples_to_remove.insert(trip);
-        }
-    }
-
-    for triple in triples_to_remove.iter() {
-        graph.remove(triple);
     }
 }
 
@@ -838,11 +842,21 @@ impl<'e> LocalScope<'e> {
         eval_context: &EvaluationContext<H>,
         resolver: &Resolver<'e, '_, '_, H>,
     ) -> Self {
-        let resource = resolver
-            .attr_1_safecurie_or_curie_or_iri("resource")
+        // subject attributes
+        let about = resolver
+            .attr_1_safecurie_or_curie_or_iri("about")
             .map(Rc::new);
+        // resource attributes
+        let resource = resolver.attr_1_safecurie_or_curie_or_iri("resource");
         let href = resolver.attr_iri("href");
         let src = resolver.attr_iri("src");
+        let resource_present = resource.is_present() || href.is_present() || src.is_present();
+        let resource_value = resource
+            .into_value()
+            .or_else(|| Some(href.into_value()?.into()))
+            .or_else(|| Some(src.into_value()?.into()))
+            .map(Rc::new);
+
         let is_root_element = resolver.el.name() == "html";
         debug_assert!(is_root_element == eval_context.parent_object.is_none());
 
@@ -862,25 +876,15 @@ impl<'e> LocalScope<'e> {
             list_mappings: eval_context.list_mapping.clone(),
 
             // local attributes:
-            is_root_element,
-            in_list: resolver.el.attr("inlist").is_some(),
+            about,
             content: resolver.el.attr("content"),
-            property: resolver.attr_many_term_or_curie_or_absiri("property"),
-            type_of: resolver.attr_many_term_or_curie_or_absiri("typeof"),
-
-            about: resolver
-                .attr_1_safecurie_or_curie_or_iri("about")
-                .map(Rc::new),
-
             datatype: resolver.attr_1_term_or_curie_or_absiri("datatype"),
-
-            // read from the "resource attributes"
-            resource_present: resource.is_present() || href.is_present() || src.is_present(),
-            resource_value: resource
-                .as_value()
-                .cloned()
-                .or_else(|| Some(Rc::new(href.into_value()?.into())))
-                .or_else(|| Some(Rc::new(src.into_value()?.into()))),
+            in_list: resolver.el.attr("inlist").is_some(),
+            is_root_element,
+            property: resolver.attr_many_term_or_curie_or_absiri("property"),
+            resource_present,
+            resource_value,
+            type_of: resolver.attr_many_term_or_curie_or_absiri("typeof"),
         }
     }
 
