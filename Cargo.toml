@@ -17,3 +17,9 @@ html2rdf = { path = "html2rdf" }
 oxiri = "0.2.11"
 oxrdf = "0.3.3"
 oxttl = "0.2.3"
+
+[profile.fuzz]
+inherits = "dev"
+opt-level = 3
+incremental = false
+codegen-units = 1

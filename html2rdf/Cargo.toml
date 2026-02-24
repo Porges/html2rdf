@@ -36,10 +36,12 @@ scraper = "0.25.0"
 tracing = "0.1.44"
 
 [dev-dependencies]
+bolero = "0.13.4"
 insta = { version = "1.46.3", features = ["glob"] }
 oxrdf = { workspace = true, features = ["rdfc-10"] }
 oxttl = { workspace = true }
 pretty_assertions = "1.4.1"
+pyo3 = "0.28.2"
 rstest = { version = "0.26.1", default-features = false, features = [
     "crate-name",
 ] }
