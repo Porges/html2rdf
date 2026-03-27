@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = [ "html2rdf" , "html2rdf-cli"]
+members = [ "html2rdf", "html2rdf-cli", "librdfa-wrapper" ]
 
 [workspace.package]
 authors = ["George Pollard <porges@porg.es>"]
@@ -14,9 +14,18 @@ rust-version = "1.88.0"
 
 [workspace.dependencies]
 html2rdf = { path = "html2rdf" }
+jiff = "^0.2.23"
+librdfa-wrapper = { path = "librdfa-wrapper" }
 oxiri = "0.2.11"
 oxrdf = "0.3.3"
 oxttl = "0.2.3"
+
+[profile.release]
+debug = 1
+
+[profile.profiling]
+inherits = "release"
+debug = true
 
 [profile.fuzz]
 inherits = "dev"

@@ -16,33 +16,45 @@ exclude = [
     "tests/test-suite/test-cases/*/svg*/*",
 ]
 
+[features]
+default = ["html", "http", "xhtml"]
+html = ["dep:scraper"]
+xhtml = ["dep:uppsala"]
+http = ["dep:reqwest"]
+
 [dependencies]
+bergshamra-c14n = "0.3.1"
+bergshamra-xml = "0.3.1"
 curie = "0.1.4"
-derive_more = { version = "2.1.1", features = [
-    "display",
-    "error",
-    "from",
-    "from_str",
-] }
-icu_locale = { version = "2.1.1" }
+derive_more = { version = "^2.1.1", features = ["display", "error", "from"] }
 indexmap = "2.13.0"
 itertools = "0.14.0"
+jiff = { workspace = true }
 mitsein = "0.9.0"
+ouroboros = "0.18.5"
+oxilangtag = "0.1.5"
 oxiri = { workspace = true }
 oxrdf = { workspace = true }
 oxsdatatypes = "0.2.2"
-rxml_validation = "0.11.0"
-scraper = "0.25.0"
+percent-encoding = "2.3.2"
+reqwest = { version = "0.13", optional = true, features = ["blocking"] }
+rxml_validation = "0.12.0"
+scraper = { version = "0.26.0", optional = true, default-features = false, features = ["errors"] }
+thiserror = "2.0.18"
 tracing = "0.1.44"
+uppsala = { version = "0.3.0", optional = true }
 
 [dev-dependencies]
 bolero = "0.13.4"
+indoc = "2.0.7"
 insta = { version = "1.46.3", features = ["glob"] }
 oxrdf = { workspace = true, features = ["rdfc-10"] }
 oxttl = { workspace = true }
 pretty_assertions = "1.4.1"
-pyo3 = "0.28.2"
 rstest = { version = "0.26.1", default-features = false, features = [
     "crate-name",
 ] }
-sha2 = "0.10.9"
+
+[target.'cfg(not(target_os = "windows"))'.dev-dependencies]
+librdfa-wrapper = { workspace = true }
+pyo3 = "0.28.2"

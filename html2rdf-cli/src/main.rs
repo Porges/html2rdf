@@ -1,16 +1,43 @@
 use std::{io::Write, process::ExitCode};
 
 use clap::Parser;
-use oxrdf::graph::{CanonicalizationAlgorithm, CanonicalizationHashAlgorithm};
+use html2rdf::{Options, algorithms::OnlineVocabularyResolver, host_language::Html5};
+use oxrdf::{
+    Graph,
+    graph::{CanonicalizationAlgorithm, CanonicalizationHashAlgorithm},
+};
 
 #[derive(Parser)]
 #[command(version, about)]
 struct Args {
-    #[arg(value_name = "URL")]
-    target: url::Url,
+    #[clap(flatten)]
+    input: InputGroup,
 
+    /// Canonicalize the resulting graph.
     #[arg(long, short = 'c')]
     canonicalize: bool,
+
+    /// Perform RDFa vocabulary expansion.
+    #[arg(long)]
+    vocab_expansion: bool,
+}
+
+#[derive(Debug, clap::Args)]
+#[group(required = true, multiple = false)]
+pub struct InputGroup {
+    /// The target URL (must be absolute).
+    #[arg(value_name = "URL")]
+    url: Option<url::Url>,
+
+    /// The target path (can be relative).
+    #[arg(long, value_name = "PATH")]
+    path: Option<std::path::PathBuf>,
+}
+
+#[derive(derive_more::Error, derive_more::Display, Debug)]
+#[display("Unsupported URL scheme `{scheme}`.")]
+struct UnsupportedUrlScheme {
+    scheme: String,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -18,40 +45,55 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
     let args = Args::parse();
-    let client = reqwest::Client::new();
-    let base = args.target.to_string();
-    let base_iri = oxiri::Iri::parse(base.clone())?;
-    let response = client.get(args.target).send().await?.error_for_status()?;
-    let content_type = response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok());
+    let base = if let Some(url) = args.input.url {
+        url
+    } else {
+        let p = args.input.path.unwrap(); // UNWRAP: clap guarantee
+        url::Url::from_file_path(dunce::canonicalize(p)?).unwrap()
+    };
+    let base_iri = oxiri::Iri::parse(base.as_str())?;
 
-    if content_type.is_some_and(|ct| !ct.starts_with("text/html")) {
-        eprintln!("Error: content type is not text/html.");
-        return Ok(ExitCode::FAILURE);
+    let mut final_url = base.clone(); // the final, resolved, URL
+    let content: String = match base.scheme() {
+        "http" | "https" => {
+            let client = reqwest::Client::new();
+            let response = client.get(base.clone()).send().await?.error_for_status()?;
+            let content_type = response
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok());
+
+            if content_type.is_some_and(|ct| !ct.starts_with("text/html")) {
+                eprintln!("Error: content type is not text/html.");
+                return Ok(ExitCode::FAILURE);
+            }
+
+            final_url = response.url().clone();
+            response.text().await?
+        }
+        "file" => std::fs::read_to_string(base.to_file_path().unwrap())?,
+        scheme => {
+            return Err(UnsupportedUrlScheme {
+                scheme: scheme.to_string(),
+            }
+            .into());
+        }
+    };
+
+    let mut options = Options::<Html5>::default();
+    if args.vocab_expansion {
+        options = options.enable_vocabulary_expansion(OnlineVocabularyResolver::default());
     }
-
-    drop(client);
-
-    let final_url = response.url().clone();
-
-    let content = response.text().await?;
-    let mut output_graph = oxrdf::Graph::new();
-    let mut processor_graph = oxrdf::Graph::new();
-    html2rdf::process(
-        &content,
-        base_iri.clone(),
-        &mut output_graph,
-        &mut processor_graph,
-    )?;
+    let (mut output_graph, processor_graph) =
+        html2rdf::doc_to_graphs::<_, Graph>(&content, base_iri.as_ref(), options)
+            .unwrap_or_else(|inf| match inf {});
 
     {
         // output any warnings/errors
         let serializer = oxttl::TurtleSerializer::new();
         let mut locked_err = std::io::stderr().lock();
         let mut writer = serializer.for_writer(&mut locked_err);
-        for triple in processor_graph.iter() {
+        for triple in &processor_graph {
             writer.serialize_triple(triple)?;
         }
 
@@ -61,8 +103,8 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
 
     {
         // use serializer with all known prefixes
-        let serializer = html2rdf::initial_context_prefixes().mappings().try_fold(
-            oxttl::TurtleSerializer::new().with_base_iri(base)?,
+        let serializer = html2rdf::initial_context::prefixes().mappings().try_fold(
+            oxttl::TurtleSerializer::new().with_base_iri(base.as_str())?,
             |serializer, (prefix, value)| serializer.with_prefix(prefix, value),
         )?;
 
@@ -72,8 +114,11 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
             });
         }
 
-        let mut locked_out = std::io::stdout().lock();
-        locked_out.write_all(
+        let locked_out = std::io::stdout().lock();
+        // yes, stdout is already buffered, but we want to just write big chunks
+        // TTL tends to write lots of short lines which performs pretty poorly with LineWriter
+        let mut out = std::io::BufWriter::new(locked_out);
+        out.write_all(
             format!(
                 "# generated by html2rdf {} at {:.0} from: {}\n",
                 clap::crate_version!(),
@@ -84,16 +129,18 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
         )?;
 
         if args.canonicalize {
-            locked_out.write_all(b"# (output has been canonicalized)\n")?;
+            out.write_all(b"# (output has been canonicalized)\n")?;
         }
 
-        let mut writer = serializer.for_writer(&mut locked_out);
-        for triple in output_graph.iter() {
-            writer.serialize_triple(triple)?;
-        }
+        {
+            let mut writer = serializer.for_writer(&mut out);
+            for triple in &output_graph {
+                writer.serialize_triple(triple)?;
+            }
 
-        writer.finish()?;
-        drop(output_graph);
+            writer.finish()?;
+        }
+        out.flush()?;
     }
 
     Ok(ExitCode::SUCCESS)
