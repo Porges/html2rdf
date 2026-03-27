@@ -14,6 +14,9 @@ use oxrdf::{
 use scraper::{ElementRef, Html, node::Element};
 use tracing::trace;
 
+use crate::processor_graph::{MessageType, ProcessorGraph};
+
+pub mod processor_graph;
 pub mod vocabs;
 
 pub fn process(
@@ -139,7 +142,7 @@ pub fn parse(
     }();
 
     if let Err(e) = get_err {
-        ProcessorGraph(processor_graph).emit(PGType::DocumentError, &e.to_string());
+        ProcessorGraph(processor_graph).emit_message(MessageType::DocumentError, &e.to_string());
     }
 
     Ok(())
@@ -488,8 +491,8 @@ impl<H: HostLanguage> ResolverData<H> {
                         self.language = Some(Rc::new(lang));
                     }
                     Err(e) => {
-                        processor_graph.borrow_mut().emit(
-                            PGType::Warning,
+                        processor_graph.borrow_mut().emit_message(
+                            MessageType::Warning,
                             &format!("Invalid language identifier ({lang}): {e}"),
                         );
                     }
@@ -635,24 +638,24 @@ impl<'e, 'rp, 'p: 'rp, H: HostLanguage> Resolver<'e, 'rp, 'p, H> {
                         CurieError::EmptyCurie
                         | CurieError::ExpansionError(ExpansionError::MissingDefault) => {}
                         CurieError::InvalidBlankNodeSuffix(suffix) => {
-                            self.processor_graph.borrow_mut().emit(
-                                PGType::UnresolvedCurie,
+                            self.processor_graph.borrow_mut().emit_message(
+                                MessageType::UnresolvedCurie,
                                 &format!(
                                     "Invalid CURIE: {value} (invalid blank node suffix: `{suffix}`)",
                                 ),
                             );
                         }
                         CurieError::InvalidIRI(iri) => {
-                            self.processor_graph.borrow_mut().emit(
-                                PGType::UnresolvedCurie,
+                            self.processor_graph.borrow_mut().emit_message(
+                                MessageType::UnresolvedCurie,
                                 &format!(
                                     "Invalid CURIE: {value} (expanded to invalid IRI value <{iri}>)",
                                 ),
                             );
                         }
                         CurieError::ExpansionError(ExpansionError::Invalid) => {
-                            self.processor_graph.borrow_mut().emit(
-                                PGType::UnresolvedCurie,
+                            self.processor_graph.borrow_mut().emit_message(
+                                MessageType::UnresolvedCurie,
                                 &format!("Invalid CURIE: {value} (no such prefix defined)"),
                             );
                         }
@@ -709,8 +712,8 @@ impl<'e, 'rp, 'p: 'rp, H: HostLanguage> Resolver<'e, 'rp, 'p, H> {
     }
 
     fn report_invalid_iri(&self, iri_err: IriParseError, value: &str) {
-        self.processor_graph.borrow_mut().emit(
-            PGType::Warning,
+        self.processor_graph.borrow_mut().emit_message(
+            MessageType::Warning,
             &format!("Invalid IRI: <{}> ({})", value, iri_err),
         );
     }
@@ -1482,57 +1485,11 @@ struct RDFaProcessor<'o, 'p> {
 }
 
 struct OutputGraph<'o>(&'o mut oxrdf::Graph);
-struct ProcessorGraph<'p>(&'p mut oxrdf::Graph);
 
 impl<'o> OutputGraph<'o> {
     fn emit(&mut self, tr: TripleRef) {
         trace!(triple = %tr, "emitting output triple");
         self.0.insert(tr);
-    }
-}
-
-impl<'p> ProcessorGraph<'p> {
-    fn emit(&mut self, pg_type: PGType, msg: &str) {
-        let warning_subj: oxrdf::NamedOrBlankNode = oxrdf::BlankNode::default().into();
-        let pg_type: oxrdf::NamedNodeRef = pg_type.into();
-        // new bnode is-a PGClass
-        let node = TripleRef::new(&warning_subj, oxrdf::vocab::rdf::TYPE, pg_type);
-        // add description
-        let desc = TripleRef::new(
-            &warning_subj,
-            vocabs::dc::DESCRIPTION,
-            oxrdf::LiteralRef::new_simple_literal(msg),
-        );
-        trace!(triple = %node, "emitting processor triple (type)");
-        self.0.insert(node);
-        trace!(triple = %desc, "emitting processor triple (description)");
-        self.0.insert(desc);
-    }
-}
-
-enum PGType {
-    // Bases
-    Error,
-    Warning,
-    // Derived
-    DocumentError,
-    VocabReferenceError,
-    UnresolvedCurie,
-    UnresolvedTerm,
-    PrefixRedefinition,
-}
-
-impl From<PGType> for oxrdf::NamedNodeRef<'static> {
-    fn from(val: PGType) -> Self {
-        match val {
-            PGType::Error => vocabs::rdfa::ERROR,
-            PGType::Warning => vocabs::rdfa::WARNING,
-            PGType::DocumentError => vocabs::rdfa::DOCUMENT_ERROR,
-            PGType::VocabReferenceError => vocabs::rdfa::VOCAB_REFERENCE_ERROR,
-            PGType::UnresolvedCurie => vocabs::rdfa::UNRESOLVED_CURIE,
-            PGType::UnresolvedTerm => vocabs::rdfa::UNRESOLVED_TERM,
-            PGType::PrefixRedefinition => vocabs::rdfa::PREFIX_REDEFINITION,
-        }
     }
 }
 
