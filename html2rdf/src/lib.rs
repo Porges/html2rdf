@@ -14,6 +14,8 @@ use oxrdf::{
 use scraper::{ElementRef, Html, node::Element};
 use tracing::trace;
 
+pub mod vocabs;
+
 pub fn process(
     input: &str,
     base: Iri<String>,
@@ -35,7 +37,7 @@ fn property_copying(graph: &mut Graph) {
             new_triples.clear();
             added_any = false;
 
-            for copy_triple in graph.triples_for_predicate(rdfa_vocab::COPY) {
+            for copy_triple in graph.triples_for_predicate(vocabs::rdfa::COPY) {
                 let copy_target: oxrdf::NamedOrBlankNodeRef = match copy_triple.object {
                     TermRef::NamedNode(n) => n.into(),
                     TermRef::BlankNode(n) => n.into(),
@@ -44,7 +46,11 @@ fn property_copying(graph: &mut Graph) {
                     }
                 };
 
-                if !graph.contains(TripleRef::new(copy_target, rdf::TYPE, rdfa_vocab::PATTERN)) {
+                if !graph.contains(TripleRef::new(
+                    copy_target,
+                    rdf::TYPE,
+                    vocabs::rdfa::PATTERN,
+                )) {
                     continue; // TODO: warning?
                 }
 
@@ -65,7 +71,7 @@ fn property_copying(graph: &mut Graph) {
     // Step 2: remove
     {
         let mut triples_to_remove = Vec::new();
-        for copy_triple in graph.triples_for_predicate(rdfa_vocab::COPY) {
+        for copy_triple in graph.triples_for_predicate(vocabs::rdfa::COPY) {
             triples_to_remove.push(copy_triple.into_owned());
             let copy_target: oxrdf::NamedOrBlankNodeRef = match copy_triple.object {
                 TermRef::NamedNode(n) => n.into(),
@@ -73,12 +79,16 @@ fn property_copying(graph: &mut Graph) {
                 TermRef::Literal(_) => continue,
             };
 
-            if !graph.contains(TripleRef::new(copy_target, rdf::TYPE, rdfa_vocab::PATTERN)) {
+            if !graph.contains(TripleRef::new(
+                copy_target,
+                rdf::TYPE,
+                vocabs::rdfa::PATTERN,
+            )) {
                 continue;
             }
 
             triples_to_remove.push(
-                TripleRef::new(copy_triple.subject, rdf::TYPE, rdfa_vocab::PATTERN).into_owned(),
+                TripleRef::new(copy_triple.subject, rdf::TYPE, vocabs::rdfa::PATTERN).into_owned(),
             );
 
             for trip in graph.triples_for_subject(copy_target) {
@@ -366,7 +376,7 @@ impl<H: HostLanguage> ResolverData<H> {
                     // >   subject = base
                     oxrdf::NamedNodeRef::new_unchecked(&self.base),
                     // >   predicate = http://www.w3.org/ns/rdfa#usesVocabulary
-                    rdfa_vocab::USES_VOCABULARY,
+                    vocabs::rdfa::USES_VOCABULARY,
                     // >   object = value from @vocab
                     &vocab,
                 ));
@@ -1466,51 +1476,6 @@ pub enum Error {
     LanguageIdentifierError(icu_locale::ParseError),
 }
 
-mod dc_vocab {
-    pub static DESCRIPTION: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://purl.org/dc/terms/description");
-}
-
-mod xhv_vocab {
-    pub static ROLE: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/1999/xhtml/vocab#role");
-}
-
-mod rdfa_vocab {
-    pub static COPY: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#copy");
-
-    pub static PATTERN: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#Pattern");
-
-    pub static ERROR: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#Error");
-
-    pub static WARNING: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#Warning");
-
-    pub static DOCUMENT_ERROR: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#DocumentError");
-
-    pub static VOCAB_REFERENCE_ERROR: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#VocabReferenceError");
-
-    pub static UNRESOLVED_CURIE: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#UnresolvedCurie");
-
-    pub static UNRESOLVED_TERM: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#UnresolvedTerm");
-
-    pub static PREFIX_REDEFINITION: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#PrefixRedefinition");
-
-    pub static CONTEXT_PROPERTY: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#context");
-
-    pub static USES_VOCABULARY: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#usesVocabulary");
-}
-
 struct RDFaProcessor<'o, 'p> {
     output: RefCell<OutputGraph<'o>>,
     processor: RefCell<ProcessorGraph<'p>>,
@@ -1535,7 +1500,7 @@ impl<'p> ProcessorGraph<'p> {
         // add description
         let desc = TripleRef::new(
             &warning_subj,
-            dc_vocab::DESCRIPTION,
+            vocabs::dc::DESCRIPTION,
             oxrdf::LiteralRef::new_simple_literal(msg),
         );
         trace!(triple = %node, "emitting processor triple (type)");
@@ -1560,13 +1525,13 @@ enum PGType {
 impl From<PGType> for oxrdf::NamedNodeRef<'static> {
     fn from(val: PGType) -> Self {
         match val {
-            PGType::Error => rdfa_vocab::ERROR,
-            PGType::Warning => rdfa_vocab::WARNING,
-            PGType::DocumentError => rdfa_vocab::DOCUMENT_ERROR,
-            PGType::VocabReferenceError => rdfa_vocab::VOCAB_REFERENCE_ERROR,
-            PGType::UnresolvedCurie => rdfa_vocab::UNRESOLVED_CURIE,
-            PGType::UnresolvedTerm => rdfa_vocab::UNRESOLVED_TERM,
-            PGType::PrefixRedefinition => rdfa_vocab::PREFIX_REDEFINITION,
+            PGType::Error => vocabs::rdfa::ERROR,
+            PGType::Warning => vocabs::rdfa::WARNING,
+            PGType::DocumentError => vocabs::rdfa::DOCUMENT_ERROR,
+            PGType::VocabReferenceError => vocabs::rdfa::VOCAB_REFERENCE_ERROR,
+            PGType::UnresolvedCurie => vocabs::rdfa::UNRESOLVED_CURIE,
+            PGType::UnresolvedTerm => vocabs::rdfa::UNRESOLVED_TERM,
+            PGType::PrefixRedefinition => vocabs::rdfa::PREFIX_REDEFINITION,
         }
     }
 }
@@ -1587,14 +1552,8 @@ pub fn initial_context_terms() -> &'static BTreeMap<String, oxrdf::NamedNode> {
                 "describedBy".to_string(),
                 oxrdf::NamedNode::new_unchecked("http://www.w3.org/2007/05/powder-s#describedby"),
             ),
-            (
-                "license".to_string(),
-                oxrdf::NamedNode::new_unchecked("http://www.w3.org/1999/xhtml/vocab#license"),
-            ),
-            (
-                "role".to_string(),
-                oxrdf::NamedNode::new_unchecked("http://www.w3.org/1999/xhtml/vocab#role"),
-            ),
+            ("license".to_string(), vocabs::xhv::LICENSE.into()),
+            ("role".to_string(), vocabs::xhv::ROLE.into()),
         ]
         .into_iter()
         .collect()
@@ -1833,7 +1792,7 @@ impl<'o, 'p> RDFaProcessor<'o, 'p> {
                 // > defined at http://www.w3.org/1999/xhtml/vocab.
                 self.output
                     .get_mut()
-                    .emit(TripleRef::new(&role_subject, xhv_vocab::ROLE, &role));
+                    .emit(TripleRef::new(&role_subject, vocabs::xhv::ROLE, &role));
             }
         }
 
