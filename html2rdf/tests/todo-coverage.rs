@@ -1,22 +1,21 @@
 // Tests that exercise known TODO/unimplemented code paths in the library.
-use html2rdf::parse;
+use html2rdf::{Options, doc_to_graphs, graphs::ProcessorGraph, host_language::Html5};
 use oxiri::Iri;
 use oxrdf::Graph;
 
 mod utils;
 
-fn base() -> Iri<String> {
-    Iri::parse("http://example.org/".to_string()).unwrap()
+fn base() -> Iri<&'static str> {
+    Iri::parse("http://example.org/").unwrap()
 }
 
-fn parse_html(html: &str) -> (Graph, Graph) {
-    let mut output_graph = Graph::new();
-    let mut processor_graph = Graph::new();
-    parse(html, base(), &mut output_graph, &mut processor_graph).unwrap();
-    (output_graph, processor_graph)
+fn parse_html<PG: ProcessorGraph + Default>(html: &str) -> (Graph, PG) {
+    doc_to_graphs(html, base(), Options::<Html5>::default()).unwrap_or_else(|inf| match inf {})
 }
 
-// lib.rs:1693-1695 — XMLLiteral datatype uses inner_html() without XML canonicalization (c14n)
+// lib.rs:813 + host_language/html.rs:129 — HTML5 XMLLiteral datatype uses
+// scraper's inner_html() without XML canonicalization (c14n).
+// Note: the XHTML path (xhtml.rs) now uses bergshamra_c14n for proper c14n.
 #[test]
 fn xml_literal_not_canonicalized() {
     let html = r#"<!DOCTYPE html>
@@ -30,7 +29,7 @@ fn xml_literal_not_canonicalized() {
     </body>
     </html>"#;
 
-    let (output, _processor) = parse_html(html);
+    let (output, ()) = parse_html(html);
 
     // Currently the literal value is just inner_html() without c14n.
     // This test documents the current (incorrect) behavior.
@@ -55,7 +54,9 @@ fn xml_literal_not_canonicalized() {
     );
 }
 
-// lib.rs:1696-1700 — rdf:HTML datatype uses inner_html() without canonicalization
+// lib.rs:817 + host_language/html.rs:129 — rdf:HTML datatype uses
+// scraper's inner_html() without canonicalization in the HTML5 path.
+// Note: the XHTML path (xhtml.rs) now uses bergshamra_c14n.
 #[test]
 fn rdf_html_literal_not_canonicalized() {
     let html = r#"<!DOCTYPE html>
@@ -69,7 +70,7 @@ fn rdf_html_literal_not_canonicalized() {
     </body>
     </html>"#;
 
-    let (output, _processor) = parse_html(html);
+    let (output, ()) = parse_html(html);
 
     let literal = output
         .iter()
@@ -91,14 +92,16 @@ fn rdf_html_literal_not_canonicalized() {
     );
 }
 
-// lib.rs:1083,1088— add_prefix().expect("TODO") blindly unwraps
-// The curie crate currently accepts most prefix strings, so this test
-// documents that invalid-looking prefixes don't error and instead succeed.
+// resolver.rs:235,248 — add_prefix() now properly handles errors via
+// if let Err(InvalidPrefixError::ReservedPrefix), emitting a processor graph
+// warning instead of panicking. The old .expect("TODO") has been fixed.
+// This test documents that invalid-looking prefixes (e.g. starting with digits)
+// are still accepted by the curie crate.
 #[test]
 fn invalid_looking_prefix_declaration_succeeds() {
     // A prefix starting with digits is technically invalid per XML NCName rules,
-    // but the curie crate accepts it. The .expect("TODO") doesn't panic here,
-    // but it would if the curie crate ever started validating prefix names.
+    // but the curie crate accepts it. add_prefix() no longer panics (the old
+    // .expect("TODO") was replaced with proper error handling in resolver.rs).
     let html = r#"<!DOCTYPE html>
     <html>
     <head><title>test</title></head>
@@ -107,8 +110,8 @@ fn invalid_looking_prefix_declaration_succeeds() {
     </body>
     </html>"#;
 
-    let (output, _processor) = parse_html(html);
-    let serialized = utils::serialize_graph(output, base().as_str());
+    let (output, ()) = parse_html(html);
+    let serialized = utils::serialize_normalized_graph(output, base().as_str());
 
     // The prefix was accepted and the CURIE resolved.
     // Since base is http://example.org/, <thing> is the relative form of http://example.org/thing.
@@ -118,7 +121,10 @@ fn invalid_looking_prefix_declaration_succeeds() {
     );
 }
 
-// lib.rs:1675 — XMLLiteral namespace preservation is not implemented
+// lib.rs:813 + host_language/html.rs:129 — HTMLElement::inner_html() does not
+// inject active namespace declarations into XMLLiteral top-level elements.
+// Note: the XHTML path (xhtml.rs:138-210) now handles namespace preservation
+// properly via cloning and inserting xmlns declarations before c14n.
 #[test]
 fn xml_literal_namespace_not_preserved() {
     // When generating XMLLiterals, active namespace prefixes should be injected
@@ -134,7 +140,7 @@ fn xml_literal_namespace_not_preserved() {
     </body>
     </html>"#;
 
-    let (output, _processor) = parse_html(html);
+    let (output, ()) = parse_html(html);
 
     let literal = output
         .iter()
@@ -156,8 +162,9 @@ fn xml_literal_namespace_not_preserved() {
     );
 }
 
-// lib.rs:788 — HTMLHost::default_vocabulary returns None (TODO)
-// lib.rs:806, 810 — XHTMLHost::default_vocabulary and default_language return None (TODO)
+// host_language/html.rs:57-58, xhtml.rs:19-20 — default_vocabulary() returns
+// None for both HTML5 and XHTML. This is correct per the specs ("The default
+// vocabulary URI is undefined"), not a TODO.
 #[test]
 fn no_default_vocabulary_without_explicit_vocab() {
     // Without an explicit @vocab, there is no default vocabulary.
@@ -172,11 +179,11 @@ fn no_default_vocabulary_without_explicit_vocab() {
     </body>
     </html>"#;
 
-    let (output, _processor) = parse_html(html);
+    let (output, ()) = parse_html(html);
 
     // Without a default vocabulary, "name" and "Thing" are bare terms that
     // cannot be resolved to IRIs, so no triples should be emitted for them.
-    let serialized = utils::serialize_graph(output, base().as_str());
+    let serialized = utils::serialize_normalized_graph(output, base().as_str());
     assert!(
         !serialized.contains("name"),
         "bare term 'name' should not resolve without a default vocabulary, got:\n{serialized}"

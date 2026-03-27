@@ -16,12 +16,14 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.5.59", features = ["cargo", "derive", "wrap_help"] }
+derive_more = { version = "2.1.1", features = ["error", "display"] }
+dunce = "1.0.5"
 html2rdf = { workspace = true }
-jiff = "0.2.20"
+jiff = { workspace = true }
 oxiri = { workspace = true }
 oxrdf = { workspace = true, features = ["rdfc-10"] }
 oxttl = { workspace = true }
-reqwest = { version = "0.13.2", default-features = false, features = ["charset", "http2", "native-tls", "system-proxy"] }
+reqwest = { version = "0.13", features = ["native-tls"] }
 tokio = { version = "1.49.0", features = ["macros", "rt"] }
 tracing-subscriber = { version = "0.3.22" }
 url = "2.5.8"

@@ -1,5 +1,5 @@
 // Samples from the RDFa 1.1 Primer: https://www.w3.org/TR/rdfa-primer/
-use html2rdf::process;
+use html2rdf::{Options, doc_to_graphs, graphs::ProcessorGraph, host_language::Html5};
 use oxiri::Iri;
 use oxrdf::Graph;
 
@@ -7,12 +7,9 @@ mod utils;
 
 static BASE: &str = "http://example.com/alice/posts/trouble_with_bob";
 
-fn process_html(html: &str) -> (Graph, Graph) {
-    let base_iri = Iri::parse(BASE.to_string()).unwrap();
-    let mut output_graph = Graph::new();
-    let mut processor_graph = Graph::new();
-    process(html, base_iri, &mut output_graph, &mut processor_graph).unwrap();
-    (output_graph, processor_graph)
+fn process_html<PG: ProcessorGraph + Default>(html: &str) -> (Graph, PG) {
+    let base_iri = Iri::parse(BASE).unwrap();
+    doc_to_graphs(html, base_iri, Options::<Html5>::default()).unwrap_or_else(|inf| match inf {})
 }
 
 #[test]
@@ -25,8 +22,8 @@ fn example_02_hints_on_social_networking_sites() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix dc: <//purl.org/dc/terms/> .
     <> dc:created "2011-09-10" ;
@@ -46,8 +43,8 @@ fn example_04_links_with_flavor() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix cc: <//creativecommons.org/ns#> .
     <> cc:license <//creativecommons.org/licenses/by/3.0/> .
@@ -64,8 +61,8 @@ fn example_06_default_vocabulary() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
     @prefix dc: <//purl.org/dc/terms/> .
@@ -85,8 +82,8 @@ fn example_07_vocab_mixed_with_full_uri() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
     @prefix dc: <//purl.org/dc/terms/> .
@@ -110,8 +107,8 @@ fn example_08_vocab_mixed_with_full_uri() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix cc: <//creativecommons.org/ns#> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
@@ -136,8 +133,8 @@ fn example_09_nested_vocab_override() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix cc: <//creativecommons.org/ns#> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
@@ -167,8 +164,8 @@ fn example_10_multiple_items_per_page() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
     @prefix dc: <//purl.org/dc/terms/> .
@@ -198,8 +195,8 @@ fn example_11_nested_resource() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
     @prefix dc: <//purl.org/dc/terms/> .
@@ -225,8 +222,8 @@ fn example_15_contact_info_typeof() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix foaf: <//xmlns.com/foaf/0.1/> .
@@ -260,8 +257,8 @@ fn example_19_friends_homepage_and_name() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix foaf: <//xmlns.com/foaf/0.1/> .
@@ -305,8 +302,8 @@ fn example_20_social_network() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix foaf: <//xmlns.com/foaf/0.1/> .
@@ -355,8 +352,8 @@ fn example_22_property_copying() {
     </body>
     </html>"##;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix cc: <//creativecommons.org/ns#> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
@@ -396,8 +393,8 @@ fn example_25_internal_references() {
     </body>
     </html>"##;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix foaf: <//xmlns.com/foaf/0.1/> .
@@ -428,8 +425,8 @@ fn example_28_prefix_attribute() {
     </body>
     </html>"##;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix dc: <//purl.org/dc/terms/> .
@@ -458,8 +455,8 @@ fn example_29_vocab_and_prefix_mixed() {
     </body>
     </html>"##;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
@@ -490,8 +487,8 @@ fn example_31_multiple_property_values() {
     </body>
     </html>"##;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix dc: <//purl.org/dc/terms/> .
@@ -522,8 +519,8 @@ fn example_32_multiple_typeof_values() {
     </body>
     </html>"##;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix foaf: <//xmlns.com/foaf/0.1/> .
@@ -547,8 +544,8 @@ fn example_33_default_prefixes() {
     </body>
     </html>"##;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix dc: <//purl.org/dc/terms/> .
     <> dc:creator <#me> ;
@@ -568,8 +565,8 @@ fn example_35_content_attribute() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix dc: <//purl.org/dc/terms/> .
     <> dc:created "2011-09-10" ;
@@ -590,8 +587,8 @@ fn example_36_meta_in_head_ogp() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix og: <//ogp.me/ns#> .
     <> og:image "http://example.com/alice/bob-ugly.jpg" ;
@@ -613,8 +610,8 @@ fn example_39_datatype() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix xsd: <//www.w3.org/2001/XMLSchema#> .
     @prefix cc: <//creativecommons.org/ns#> .
@@ -637,8 +634,8 @@ fn example_43_about_attribute() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
     @prefix dc: <//purl.org/dc/terms/> .
@@ -669,8 +666,8 @@ fn example_46_rel_chaining() {
     </body>
     </html>"##;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix foaf: <//xmlns.com/foaf/0.1/> .
@@ -716,8 +713,8 @@ fn example_26_multiple_blogs_same_creator() {
     </body>
     </html>"##;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix foaf: <//xmlns.com/foaf/0.1/> .
@@ -754,8 +751,8 @@ fn example_23_inline_foaf_mixed_vocab() {
     </body>
     </html>"#;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix foaf: <//xmlns.com/foaf/0.1/> .
@@ -786,8 +783,8 @@ fn example_27_vocab_with_full_uri_fallback() {
     </body>
     </html>"##;
 
-    let (output, _) = process_html(html);
-    insta::assert_snapshot!(utils::serialize_graph(output, BASE), @r#"
+    let (output, ()) = process_html(html);
+    insta::assert_snapshot!(utils::serialize_normalized_graph(output, BASE), @r#"
     @base <http://example.com/alice/posts/trouble_with_bob> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .

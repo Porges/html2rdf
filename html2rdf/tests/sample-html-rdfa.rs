@@ -24,5 +24,6 @@ pub fn example1_2() {
     <http://schema.org/url> <http://example.org/> .
     "#;
 
-    utils::assert_graph(html, ttl);
+    let base = oxiri::Iri::parse("http://example.org/").unwrap();
+    utils::assert_ttl(base, html, ttl);
 }
