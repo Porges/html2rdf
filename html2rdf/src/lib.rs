@@ -197,16 +197,16 @@ pub fn parse<H: HostLanguage>(
 struct EvaluationContext<'r> {
     resolver: Resolver<'r>,
 
+    // Spec text:
     // > The parent subject. The initial value will be the same as the initial value of base,
     // > but it will usually change during the course of processing.
-    list_subject: Rc<oxrdf::NamedOrBlankNode>,
-
+    //
     // > The parent object. In some situations the object of a statement becomes the subject
     // > of any nested statements, and this member is used to convey this value. Note that this
     // > value may be a bnode, since in some situations a number of nested statements are grouped
     // > together on one bnode. This means that the bnode must be set in the containing statement and passed down.
     //
-    // Here I call it the subject:
+    // Here we only need one field which tracks the parent/current subject.
     subject: Rc<oxrdf::NamedOrBlankNode>,
 
     // > A list of incomplete triples. A triple can be incomplete when no object resource is provided
@@ -236,14 +236,8 @@ impl<'r> EvaluationContext<'r> {
             // > value different from the parent object [=subject], the list mapping taken from
             // > the evaluation context is set to a new, empty mapping.
             me.list_mapping = Rc::default();
-            me.list_subject.clone_from(&new_subject);
         }
         me.subject = new_subject;
-    }
-
-    fn chain_object(self: &mut Rc<EvaluationContext<'r>>, new_object: Rc<NamedOrBlankNode>) {
-        let me = Rc::make_mut(self);
-        me.subject = new_object;
     }
 }
 
@@ -267,7 +261,6 @@ impl<'r> EvaluationContext<'r> {
         let root: Rc<NamedOrBlankNode> =
             Rc::new(NamedNode::from(resolver_data.base.clone()).into());
         Self {
-            list_subject: root.clone(),
             subject: root,
             list_mapping: Rc::default(),
             incomplete_triples: Vec::default(),
@@ -314,54 +307,62 @@ impl<'a, H: HostLanguage, O: OutputGraph, P: ProcessorGraph> RDFaProcessor<'a, H
 
                     let new_ctx = self.process_element(eval_context, &element);
                     if element.has_children() {
+                        // mark that we will need to output the list later
                         stack.push(S::OutputList(
-                            new_ctx.list_subject.clone(),
+                            new_ctx.subject.clone(),
                             new_ctx.list_mapping.clone(),
                         ));
-                    }
 
-                    for child in element.child_elements().rev() {
-                        let span = tracing::trace_span!("element", tag_name = child.tag_name());
-                        stack.push(S::Child(child, new_ctx.clone(), span));
-                    }
-                }
-                S::OutputList(subject, list_mapping) => {
-                    // [rdfa-core] 7.5: 14.
-                    // > Finally, if there is one or more mapping in the local list mapping,
-                    // > list triples are generated as follows:
-                    // >
-                    // > For each IRI in the local list mapping, if the equivalent list does not
-                    // > exist in the evaluation context, indicating that the list was originally
-                    // > instantiated on the current element, use the list as follows:
-                    if let Ok(list_mapping) = Rc::try_unwrap(list_mapping) {
-                        // NB: if we successfully unwrap it, that means the list mapping
-                        //     is complete
-                        for (iri, list) in list_mapping.into_inner().lists {
-                            // > If there are zero items in the list associated with the IRI,
-                            // > generate the following triple:
-                            let mut next: NamedOrBlankNode = rdf::NIL.into();
-                            for item in list.borrow().iter().rev() {
-                                let me = oxrdf::BlankNode::default();
-                                self.output.emit(
-                                    me.as_ref().into(),
-                                    rdf::FIRST,
-                                    item.as_ref().into(),
-                                );
-                                self.output.emit(
-                                    me.as_ref().into(),
-                                    rdf::REST,
-                                    next.as_ref().into(),
-                                );
-                                next = me.into();
-                            }
-                            self.output.emit(
-                                subject.as_ref().into(),
-                                iri.as_ref(),
-                                next.as_ref().into(),
-                            );
+                        for child in element.child_elements().rev() {
+                            let span = tracing::trace_span!("element", tag_name = child.tag_name());
+                            stack.push(S::Child(child, new_ctx.clone(), span));
+                        }
+                    } else {
+                        // otherwise try to output the list now (if any)
+                        if let Ok(ctx) = Rc::try_unwrap(new_ctx) {
+                            self.emit_lists(ctx.subject, ctx.list_mapping);
+                        } else {
+                            // we might not be able to unwrap it if the context was shared
+                            // if this happens, then it cannot have had a new list_mapping set
                         }
                     }
                 }
+                S::OutputList(subject, list_mapping) => {
+                    self.emit_lists(subject, list_mapping);
+                }
+            }
+        }
+    }
+
+    fn emit_lists(
+        &mut self,
+        subject: Rc<NamedOrBlankNode>,
+        list_mapping: Rc<RefCell<ListMapping>>,
+    ) {
+        // [rdfa-core] 7.5: 14.
+        // > Finally, if there is one or more mapping in the local list mapping,
+        // > list triples are generated as follows:
+        // >
+        // > For each IRI in the local list mapping, if the equivalent list does not
+        // > exist in the evaluation context, indicating that the list was originally
+        // > instantiated on the current element, use the list as follows:
+        if let Ok(list_mapping) = Rc::try_unwrap(list_mapping) {
+            // NB: if we successfully unwrap it, that means the list mapping
+            //     is complete
+            for (iri, list) in list_mapping.into_inner().lists {
+                // > If there are zero items in the list associated with the IRI,
+                // > generate the following triple:
+                let mut next: NamedOrBlankNode = rdf::NIL.into();
+                for item in list.borrow().iter().rev() {
+                    let me = oxrdf::BlankNode::default();
+                    self.output
+                        .emit(me.as_ref().into(), rdf::FIRST, item.as_ref().into());
+                    self.output
+                        .emit(me.as_ref().into(), rdf::REST, next.as_ref().into());
+                    next = me.into();
+                }
+                self.output
+                    .emit(subject.as_ref().into(), iri.as_ref(), next.as_ref().into());
             }
         }
     }
@@ -410,16 +411,7 @@ impl<'a, H: HostLanguage, O: OutputGraph, P: ProcessorGraph> RDFaProcessor<'a, H
         //     and a [local name] that starts with @xmlns:, create an [IRI mapping] by storing the [local name]
         //     part with the @xmlns: characters removed as the value to be mapped, and the [Node.nodeValue] as
         //     the value to map.
-        let xmlns_prefixes = el
-            .namespaces()
-            .filter_map(|(local, value)| -> Option<_> {
-                if local.is_empty() {
-                    None // don't let xmlns="..." define an empty namespace
-                } else {
-                    Some((local, value))
-                }
-            })
-            .collect::<Vec<_>>();
+        let xmlns_prefixes = el.namespaces().collect::<Vec<_>>();
 
         let prefixes = el
             .attr("prefix")

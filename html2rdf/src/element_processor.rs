@@ -343,30 +343,35 @@ impl<'e, 'ec, 'r, 'pg, E: Element, PG: ProcessorGraph> ElementProcessor<'e, 'ec,
         self.subject_established(output);
 
         if let Some(resource) = self.get_resource() {
-            Self::type_resource(&mut type_of, resource.as_ref(), "@resource", output);
+            let typed = Self::type_resource(&mut type_of, resource.as_ref(), "@resource", output);
+            self.emit_props(
+                props.unwrap_or_default(),
+                typed.then_some(resource.as_ref()),
+                output,
+            );
             self.emit_relation_triples(resource.as_ref(), relations, output);
-            self.emit_props(props.unwrap_or_default(), None, output);
-            self.ctx.chain_object(Rc::new(resource));
+            self.ctx.new_subject(Rc::new(resource), "chained @resource");
         } else if let Some(type_of) = type_of.take() {
             let new_node: NamedOrBlankNode = oxrdf::BlankNode::default().into();
             Self::emit_type(&type_of, new_node.as_ref(), "@typeof bnode", output);
             self.emit_relation_triples(new_node.as_ref(), relations, output);
             self.emit_props(props.unwrap_or_default(), Some(new_node.as_ref()), output);
-            self.ctx.chain_object(Rc::new(new_node));
+            self.ctx
+                .new_subject(Rc::new(new_node), "chained @typeof bnode");
         } else {
             self.store_incomplete_triples(relations);
             // > Also, current object resource should be set to a newly created bnode
             // > (so that the incomplete triples have a subject to connect to if they
             // > are ultimately turned into triples);
-            self.ctx.chain_object(Rc::new(BlankNode::default().into()));
+            self.emit_props(props.unwrap_or_default(), None, output);
+            self.ctx.new_subject(
+                Rc::new(BlankNode::default().into()),
+                "new bnode for incomplete triples",
+            );
         }
 
         // this case _always_ chains an object
         // (but the object might be the same, so we can't assert that easily)
-        debug_assert_ne!(
-            Rc::as_ptr(&self.ctx.list_subject),
-            Rc::as_ptr(&self.ctx.subject)
-        );
     }
 
     pub fn process(&mut self, output: &mut impl OutputGraph) {
@@ -412,10 +417,10 @@ impl<'e, 'ec, 'r, 'pg, E: Element, PG: ProcessorGraph> ElementProcessor<'e, 'ec,
 
         if let Some(resource) = self.get_resource() {
             self.emit_props(props, Some(resource.as_ref()), output);
-            if let Some(type_of) = std::mem::take(&mut type_of) {
-                Self::emit_type(&type_of, resource.as_ref(), "@resource", output);
+            let typed = Self::type_resource(&mut type_of, resource.as_ref(), "@resource", output);
+            if typed {
                 // @resource is only chained if it had @typeof
-                self.ctx.chain_object(Rc::new(resource));
+                self.ctx.new_subject(Rc::new(resource), "chained @resource");
             }
         } else if let Some(type_of) = std::mem::take(&mut type_of) {
             let typed_resource: NamedOrBlankNode = oxrdf::BlankNode::default().into();
@@ -430,7 +435,8 @@ impl<'e, 'ec, 'r, 'pg, E: Element, PG: ProcessorGraph> ElementProcessor<'e, 'ec,
                 output,
             );
             Self::emit_type(&type_of, typed_resource.as_ref(), "@typeof bnode", output);
-            self.ctx.chain_object(Rc::new(typed_resource));
+            self.ctx
+                .new_subject(Rc::new(typed_resource), "chained @typeof bnode");
         } else {
             self.emit_props(props, None, output);
         }
@@ -702,14 +708,18 @@ impl<'e, 'ec, 'r, 'pg, E: Element, PG: ProcessorGraph> ElementProcessor<'e, 'ec,
     }
 
     /// the @typeof can only apply to one resource; this lets the first taker win
+    /// returns `true` if @typeof was applied (even if empty)
     fn type_resource(
         type_of: &mut Option<Vec<NamedNode>>,
         typed_resource: NamedOrBlankNodeRef<'_>,
         source: &'static str,
         output: &mut impl OutputGraph,
-    ) {
+    ) -> bool {
         if let Some(type_of) = std::mem::take(type_of) {
             Self::emit_type(&type_of, typed_resource, source, output);
+            true
+        } else {
+            false
         }
     }
 

@@ -261,7 +261,7 @@ pub fn assert_graph_eq_ttl(base: oxiri::Iri<&str>, graph: Graph, expected_ttl: &
     pretty_assertions::assert_eq!(output, ttl_output);
 }
 
-fn ttl_to_graph(ttl: &str) -> Graph {
+pub fn ttl_to_graph(ttl: &str) -> Graph {
     let mut ttl_graph = Graph::new();
     {
         let ttl_rdf = oxttl::TurtleParser::new().for_slice(ttl.as_bytes());
@@ -271,4 +271,45 @@ fn ttl_to_graph(ttl: &str) -> Graph {
     }
 
     ttl_graph
+}
+
+fn graph_to_dataset(graph: &Graph) -> oxrdf::Dataset {
+    oxrdf::Dataset::from_iter(
+        graph
+            .iter()
+            .map(|t| t.in_graph(oxrdf::GraphNameRef::DefaultGraph)),
+    )
+}
+
+/// Evaluates a SPARQL ASK query against a graph and returns the boolean result.
+pub fn ask(graph: &Graph, sparql: &str) -> bool {
+    let dataset = graph_to_dataset(graph);
+    let query = spargebra::SparqlParser::new()
+        .parse_query(sparql)
+        .unwrap_or_else(|e| panic!("invalid SPARQL query: {e}\n\n{sparql}"));
+    let results = spareval::QueryEvaluator::new()
+        .prepare(&query)
+        .execute(&dataset);
+    match results.unwrap() {
+        spareval::QueryResults::Boolean(b) => b,
+        _ => panic!("expected ASK (boolean) result"),
+    }
+}
+
+/// Asserts that a SPARQL ASK query returns true against the given graph.
+pub fn assert_ask(graph: &Graph, sparql: &str) {
+    assert!(
+        ask(graph, sparql),
+        "ASK query returned false:\n{sparql}\n\nActual graph:\n{}",
+        serialize_normalized_graph(graph.clone(), base().as_str()),
+    );
+}
+
+/// Asserts that a SPARQL ASK query returns false against the given graph.
+pub fn assert_not_ask(graph: &Graph, sparql: &str) {
+    assert!(
+        !ask(graph, sparql),
+        "ASK query returned true:\n{sparql}\n\nActual graph:\n{}",
+        serialize_normalized_graph(graph.clone(), base().as_str()),
+    );
 }

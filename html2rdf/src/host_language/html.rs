@@ -142,7 +142,7 @@ impl super::Element for Element<'_> {
     }
 
     fn has_children(&self) -> bool {
-        self.borrow_el_ref().has_children()
+        scraper::Element::first_element_child(self.borrow_el_ref()).is_some()
     }
 
     fn child_elements(&self) -> impl DoubleEndedIterator<Item = Self> {
@@ -153,7 +153,7 @@ impl super::Element for Element<'_> {
 
     fn namespaces(&self) -> impl Iterator<Item = (&str, &str)> {
         self.borrow_el().attrs.iter().filter_map(|(qname, value)| {
-            Some((qname.local.as_ref().strip_prefix("xmlns")?, value.as_ref()))
+            Some((qname.local.as_ref().strip_prefix("xmlns:")?, value.as_ref()))
         })
     }
 }

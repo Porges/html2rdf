@@ -140,8 +140,12 @@ impl<'r> Resolver<'r> {
 
         // add XMLNS (must be first)
         for (prefix, iri) in xmlns_prefixes {
+            if prefix.is_empty() {
+                continue;
+            }
+            let prefix = prefix.to_ascii_lowercase();
             if let Err(curie::InvalidPrefixError::ReservedPrefix) =
-                iri_mappings.add_prefix(prefix, iri)
+                iri_mappings.add_prefix(&prefix, iri)
             {
                 processor_graph.emit_message(
                     PGClass::PrefixRedefinition,
@@ -153,8 +157,12 @@ impl<'r> Resolver<'r> {
 
         // add others (after XMLNS)
         for (prefix, iri) in prefixes {
+            if prefix.is_empty() {
+                continue;
+            }
+            let prefix = prefix.to_ascii_lowercase();
             if let Err(curie::InvalidPrefixError::ReservedPrefix) =
-                iri_mappings.add_prefix(prefix, iri)
+                iri_mappings.add_prefix(&prefix, iri)
             {
                 processor_graph.emit_message(
                     PGClass::PrefixRedefinition,
@@ -297,6 +305,7 @@ impl Resolver<'_> {
             return Err(CurieError::EmptyCurie);
         }
 
+        let lowered_prefix;
         let curie = if let Some((prefix, suffix)) = value.split_once(':') {
             if prefix == "_" {
                 if suffix.is_empty() {
@@ -315,7 +324,10 @@ impl Resolver<'_> {
                     .into());
             }
 
-            Curie::new(Some(prefix), suffix)
+            // lookups must be performed case-insensitively:
+            // we lowercase to match
+            lowered_prefix = prefix.to_ascii_lowercase();
+            Curie::new(Some(&lowered_prefix), suffix)
         } else {
             Curie::new(None, value)
         };

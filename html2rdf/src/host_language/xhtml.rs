@@ -225,7 +225,9 @@ impl super::Element for (&uppsala::Document<'_>, uppsala::NodeId) {
     }
 
     fn has_children(&self) -> bool {
-        self.0.first_child(self.1).is_some()
+        self.0
+            .children_iter(self.1)
+            .any(|c| self.0.element(c).is_some())
     }
 
     fn child_elements(&self) -> impl DoubleEndedIterator<Item = Self> {
