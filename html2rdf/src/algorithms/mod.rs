@@ -4,6 +4,11 @@ mod property_copying;
 mod vocabulary_expansion;
 
 pub use property_copying::property_copying;
-pub use vocabulary_expansion::{
-    OfflineVocabularyResolver, OnlineVocabularyResolver, VocabularyResolver, vocabulary_expansion,
-};
+
+#[cfg(feature = "html")]
+pub use vocabulary_expansion::OfflineVocabularyResolver;
+
+#[cfg(feature = "vocab-online")]
+pub use vocabulary_expansion::OnlineVocabularyResolver;
+
+pub use vocabulary_expansion::{VocabularyResolver, vocabulary_expansion};

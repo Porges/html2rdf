@@ -6,10 +6,7 @@ use oxrdf::{
     vocab::{rdf, rdfs},
 };
 
-use crate::{
-    host_language::Html5,
-    vocab::{owl, rdfa},
-};
+use crate::vocab::{owl, rdfa};
 
 pub trait VocabularyResolver {
     fn resolve(&self, vocab_iri: &str) -> Option<Cow<'_, Graph>>;
@@ -23,12 +20,12 @@ impl<T: VocabularyResolver> VocabularyResolver for &T {
 
 /// Allows resolving vocabularies by fetching their target IRIs
 /// over HTTP(S).
-#[cfg(feature = "http")]
+#[cfg(feature = "vocab-online")]
 pub struct OnlineVocabularyResolver {
     client: reqwest::blocking::Client,
 }
 
-#[cfg(feature = "http")]
+#[cfg(feature = "vocab-online")]
 impl Default for OnlineVocabularyResolver {
     fn default() -> Self {
         Self {
@@ -38,8 +35,9 @@ impl Default for OnlineVocabularyResolver {
 }
 
 // yo dawg
+#[cfg(feature = "html")]
 fn vocab_from_html(html: &str, base: Iri<&str>) -> Graph {
-    let (o_graph, ()) = crate::doc_to_graphs::<Html5, ()>(
+    let (o_graph, ()) = crate::doc_to_graphs::<crate::host_language::Html5, ()>(
         html,
         base.as_ref(),
         crate::Options::default(), // we explicitly do _not_ enable expansion on vocabularies
@@ -48,7 +46,7 @@ fn vocab_from_html(html: &str, base: Iri<&str>) -> Graph {
     o_graph
 }
 
-#[cfg(feature = "http")]
+#[cfg(feature = "vocab-online")]
 impl VocabularyResolver for OnlineVocabularyResolver {
     fn resolve(&self, vocab_iri: &str) -> Option<Cow<'_, Graph>> {
         use tracing::debug;
@@ -79,16 +77,19 @@ impl VocabularyResolver for OnlineVocabularyResolver {
 /// Allows resolving vocabularies through a preloaded
 /// set of vocabulary documents, for offline processing.
 #[derive(Default)]
+#[cfg(feature = "html")]
 pub struct OfflineVocabularyResolver {
     vocabularies: std::collections::HashMap<String, Graph>,
 }
 
+#[cfg(feature = "html")]
 impl VocabularyResolver for OfflineVocabularyResolver {
     fn resolve(&self, vocab_iri: &str) -> Option<Cow<'_, Graph>> {
         self.vocabularies.get(vocab_iri).map(Cow::Borrowed)
     }
 }
 
+#[cfg(feature = "html")]
 impl OfflineVocabularyResolver {
     pub fn insert(&mut self, vocab_iri: String, graph: Graph) {
         self.vocabularies.insert(vocab_iri, graph);

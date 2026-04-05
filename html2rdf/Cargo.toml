@@ -17,10 +17,10 @@ exclude = [
 ]
 
 [features]
-default = ["html", "http", "xhtml"]
+default = ["html", "vocab-online", "xhtml"]
 html = ["dep:scraper"]
 xhtml = ["dep:uppsala"]
-http = ["dep:reqwest"]
+vocab-online = ["dep:reqwest", "html"]
 
 [dependencies]
 bergshamra-c14n = "0.3.1"

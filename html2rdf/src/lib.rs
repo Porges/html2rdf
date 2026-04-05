@@ -18,7 +18,7 @@
 //! The following features are available, all enabled by default:
 //! - `html`: enables HTML5 processing (via `scraper`)
 //! - `xhtml`: enables XHTML processing (via `uppsala`)
-//! - `http`: enables the use of [`algorithms::OnlineVocabularyProcessor`]
+//! - `vocab-online`: enables the use of [`algorithms::OnlineVocabularyProcessor`] (this also enables `html`)
 //!
 //! ## Known Issues
 //! - `XMLLiteral` values are not yet correctly canonicalized in HTML5
