@@ -156,6 +156,19 @@ impl super::Element for (&uppsala::Document<'_>, uppsala::NodeId) {
         // NOTE: I assume that ids are stable when cloning
         let el = doc.element_mut(self.1).unwrap();
 
+        // Collect inherited namespace declarations from ancestors of the current
+        // element. We must be careful to not shadow these with a prefix that
+        // only differs by case.
+        let mut inherited_ns: std::collections::HashMap<&str, &str> =
+            std::collections::HashMap::new();
+        for ancestor_id in self.0.ancestors(self.1).into_iter().rev() {
+            if let Some(ancestor_el) = self.0.element(ancestor_id) {
+                for (prefix, uri) in &ancestor_el.namespace_declarations {
+                    inherited_ns.insert(prefix.as_ref(), uri.as_ref());
+                }
+            }
+        }
+
         // copy in all the active mappings as xmlns
         // this is simpler than tracking whether we need to add them as xmlns
         // or as prefixes, and it matches what the test suite does
@@ -163,12 +176,18 @@ impl super::Element for (&uppsala::Document<'_>, uppsala::NodeId) {
         for (prefix, value) in active_mappings.mappings() {
             // note that there's a little tricky case where a prefix redefined a xmlns
             // in which case we need to ensure that _both_ are present on child nodes
-            // so the XML side and the RDFa side remain correct
-            if el
+            // so the XML side and the RDFa side remain correct.
+            // We must also check inherited ancestor namespaces — a lowercased @prefix
+            // colliding with an inherited xmlns would corrupt element name resolution.
+            let conflicts_with_existing = el
                 .namespace_declarations
                 .iter()
                 .any(|(p, v)| p == prefix && v != value)
-            {
+                || inherited_ns
+                    .get(prefix.as_str())
+                    .is_some_and(|v| *v != value);
+
+            if conflicts_with_existing {
                 prefixes.push((prefix, value));
             } else {
                 el.namespace_declarations
@@ -197,7 +216,7 @@ impl super::Element for (&uppsala::Document<'_>, uppsala::NodeId) {
                             if !prefix_attr.is_empty() {
                                 prefix_attr.push(' ');
                             }
-                            _ = write!(prefix_attr, "{prefix}: {value} ");
+                            _ = write!(prefix_attr, "{prefix}: {value}");
                         }
                     }
                     if !prefix_attr.is_empty() {

@@ -1,3 +1,4 @@
+use insta::assert_snapshot;
 use oxrdf::{Graph, TermRef, vocab::rdf};
 
 use crate::utils::serialize_graph;
@@ -102,7 +103,7 @@ fn element_prefix_xmlns_conflict_parent() {
     insta::assert_snapshot!(serialize_graph(&g, utils::base().as_str()), @r#"
     @base <http://example.test/> .
     @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
-    <> <ex:desc> "<k:p xmlns:k=\"http://another.ns/\" prefix=\"k: http://prefix.ns/ \">.<b xmlns=\"http://www.w3.org/1999/xhtml\" property=\"k:foo\">value</b>.</k:p>"^^rdf:XMLLiteral ;
+    <> <ex:desc> "<k:p xmlns:k=\"http://another.ns/\" prefix=\"k: http://prefix.ns/\">.<b xmlns=\"http://www.w3.org/1999/xhtml\" property=\"k:foo\">value</b>.</k:p>"^^rdf:XMLLiteral ;
     	<//prefix.ns/foo> "value" .
     "#);
 }
@@ -180,4 +181,35 @@ fn element_prefix_xmlns_conflict_child() {
     <> <ex:desc> "<k:p xmlns:k=\"http://another.ns/\" prefix=\"k: http://prefix.ns/\">.<b xmlns=\"http://www.w3.org/1999/xhtml\" property=\"k:foo\">value</b>.</k:p>"^^rdf:XMLLiteral ;
     	<//prefix.ns/foo> "value" .
     "#);
+}
+
+/// When @prefix lowercases FOO→foo, and xmlns:foo already exists with a
+/// different URI, we must ensure that it doesn't affect the XML namespaces.
+#[test]
+fn lowered_prefix_shadows_xmlns_in_xmlliteral() {
+    let input = r#"<?xml version="1.0" encoding="UTF-8"?>
+    <html xmlns="http://www.w3.org/1999/xhtml" xmlns:foo="http://original.ns/">
+    <body prefix="FOO: http://rdfa-prefix.ns/">
+    <div property="ex:desc" datatype="rdf:XMLLiteral">
+      <foo:bar>content</foo:bar>
+    </div>
+    </body>
+    </html>"#;
+    let (g, _) = utils::parse_xhtml(input);
+
+    // The XMLLiteral should preserve the original XML namespace for foo:bar,
+    // i.e. xmlns:foo="http://original.ns/", NOT the lowered @prefix value.
+    let xml_literal = g
+        .iter()
+        .find_map(|t| match t.object {
+            oxrdf::TermRef::Literal(l) if l.datatype() == rdf::XML_LITERAL => {
+                Some(l.value().to_string())
+            }
+            _ => None,
+        })
+        .expect("should have XMLLiteral");
+
+    // foo:bar must be in namespace http://original.ns/, not http://rdfa-prefix.ns/
+    assert_snapshot!(xml_literal,
+        @r#"<foo:bar xmlns:foo="http://original.ns/" prefix="foo: http://rdfa-prefix.ns/">content</foo:bar>"#);
 }
