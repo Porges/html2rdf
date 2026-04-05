@@ -7,21 +7,117 @@ expression: "utils::serialize_normalized_graph(processor_graph, base.as_str(),)"
 @prefix xsd: <//www.w3.org/2001/XMLSchema#> .
 @prefix rdfa: <//www.w3.org/ns/rdfa#> .
 @prefix dc: <//purl.org/dc/terms/> .
-_:c14n0 a rdfa:PrefixRedefinition ;
+_:c14n0 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `pred/rev`" .
+_:c14n1 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `pred/rel`" .
+_:c14n10 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'xsd' redefined via @prefix" .
+_:c14n11 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'earl' redefined via @xmlns" .
+_:c14n12 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'owl' redefined via @prefix" .
+_:c14n13 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'xhv' redefined via @prefix" .
+_:c14n14 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `class/Person`" .
+_:c14n15 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'cc' redefined via @prefix" .
+_:c14n16 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'ex' redefined via @prefix" .
+_:c14n17 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `pred/name`" .
+_:c14n18 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @xmlns" .
+_:c14n19 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @xmlns" .
+_:c14n2 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'ical' redefined via @prefix" .
+_:c14n20 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @xmlns" .
+_:c14n21 a rdfa:Warning ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid IRI: <> (No scheme found in an absolute IRI)" .
+_:c14n22 a rdfa:Warning ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid IRI: <> (No scheme found in an absolute IRI)" .
+_:c14n23 a rdfa:Warning ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid IRI: <> (No scheme found in an absolute IRI)" .
+_:c14n24 a rdfa:Warning ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid IRI: <> (No scheme found in an absolute IRI)" .
+_:c14n25 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'dc' redefined via @prefix" .
+_:c14n26 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'dc' redefined via @prefix" .
+_:c14n27 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'dc' redefined via @prefix" .
+_:c14n28 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'dc' redefined via @prefix" .
+_:c14n29 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n3 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `pred/lang`" .
+_:c14n30 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n31 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n32 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n33 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n34 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n35 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n36 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n37 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n4 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'rdf' redefined via @prefix" .
+_:c14n5 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'v' redefined via @prefix" .
+_:c14n6 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'rdfs' redefined via @prefix" .
+_:c14n7 a rdfa:PrefixRedefinition ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
 	dc:description "ignoring attempt to add prefix assignment via @prefix for reserved prefix '_'" .
-_:c14n1 a rdfa:PrefixRedefinition ;
+_:c14n8 a rdfa:PrefixRedefinition ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
 	dc:description "ignoring attempt to add prefix assignment via @xmlns for reserved prefix '_'" .
-_:c14n2 a rdfa:Warning ;
+_:c14n9 a rdfa:PrefixRedefinition ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
-	dc:description "Invalid IRI: <> (No scheme found in an absolute IRI)" .
-_:c14n3 a rdfa:Warning ;
-	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
-	dc:description "Invalid IRI: <> (No scheme found in an absolute IRI)" .
-_:c14n4 a rdfa:Warning ;
-	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
-	dc:description "Invalid IRI: <> (No scheme found in an absolute IRI)" .
-_:c14n5 a rdfa:Warning ;
-	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
-	dc:description "Invalid IRI: <> (No scheme found in an absolute IRI)" .
+	dc:description "prefix 'sioc' redefined via @prefix" .

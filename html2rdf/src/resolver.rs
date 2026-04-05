@@ -144,6 +144,23 @@ impl<'r> Resolver<'r> {
                 continue;
             }
             let prefix = prefix.to_ascii_lowercase();
+
+            // TODO: no fast way to see if a prefix is present, currently
+            let test_c = Curie::new(Some(&prefix), "");
+            if iri_mappings.expand_curie(&test_c).is_ok()
+                || self
+                    .constant_data
+                    .host_prefix_mappings
+                    .expand_curie(&test_c)
+                    .is_ok()
+            {
+                processor_graph.emit_message(
+                    PGClass::PrefixRedefinition,
+                    &format!("prefix '{prefix}' redefined via @xmlns"),
+                    None, // TODO: context
+                );
+            }
+
             if let Err(curie::InvalidPrefixError::ReservedPrefix) =
                 iri_mappings.add_prefix(&prefix, iri)
             {
@@ -161,6 +178,23 @@ impl<'r> Resolver<'r> {
                 continue;
             }
             let prefix = prefix.to_ascii_lowercase();
+
+            // TODO: no fast way to see if a prefix is present, currently
+            let test_c = Curie::new(Some(&prefix), "");
+            if iri_mappings.expand_curie(&test_c).is_ok()
+                || self
+                    .constant_data
+                    .host_prefix_mappings
+                    .expand_curie(&test_c)
+                    .is_ok()
+            {
+                processor_graph.emit_message(
+                    PGClass::PrefixRedefinition,
+                    &format!("prefix '{prefix}' redefined via @prefix"),
+                    None, // TODO: context
+                );
+            }
+
             if let Err(curie::InvalidPrefixError::ReservedPrefix) =
                 iri_mappings.add_prefix(&prefix, iri)
             {
@@ -266,7 +300,9 @@ impl Resolver<'_> {
                 Ok(Some(term))
             } else {
                 // > Otherwise, the term has no associated IRI and MUST be ignored.
-                Err(InvalidTerm)
+                Err(InvalidTerm {
+                    term: term.to_string(),
+                })
             }
         } else {
             // not a term

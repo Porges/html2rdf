@@ -7,41 +7,347 @@ expression: "utils::serialize_normalized_graph(processor_graph, base.as_str(),)"
 @prefix xsd: <//www.w3.org/2001/XMLSchema#> .
 @prefix rdfa: <//www.w3.org/ns/rdfa#> .
 @prefix dc: <//purl.org/dc/terms/> .
-_:c14n0 a rdfa:DocumentError ;
+_:c14n0 a rdfa:UnresolvedTerm ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
-	dc:description "Unexpected open element" ;
-	rdfa:context "http://rdfa.info/test-suite/test-cases/rdfa1.1/html5-invalid/0295.html" .
-_:c14n1 a rdfa:PrefixRedefinition ;
+	dc:description "Invalid term: `pred/rev`" .
+_:c14n1 a rdfa:UnresolvedTerm ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
-	dc:description "ignoring attempt to add prefix assignment via @prefix for reserved prefix '_'" .
-_:c14n10 a rdfa:DocumentError ;
-	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
-	dc:description "Unacknowledged self-closing tag" ;
-	rdfa:context "http://rdfa.info/test-suite/test-cases/rdfa1.1/html5-invalid/0295.html" .
-_:c14n2 a rdfa:PrefixRedefinition ;
+	dc:description "Invalid term: `pred/rel`" .
+_:c14n10 a rdfa:PrefixRedefinition ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
 	dc:description "ignoring attempt to add prefix assignment via @xmlns for reserved prefix '_'" .
-_:c14n3 a rdfa:DocumentError ;
+_:c14n100 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `prev`" .
+_:c14n101 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `copyright`" .
+_:c14n102 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `copyright`" .
+_:c14n103 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `copyright`" .
+_:c14n104 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `last`" .
+_:c14n105 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `last`" .
+_:c14n106 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `last`" .
+_:c14n107 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `start`" .
+_:c14n108 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `start`" .
+_:c14n109 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `start`" .
+_:c14n11 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'sioc' redefined via @prefix" .
+_:c14n110 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `icon`" .
+_:c14n111 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `icon`" .
+_:c14n112 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `icon`" .
+_:c14n12 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'xsd' redefined via @prefix" .
+_:c14n13 a rdfa:DocumentError ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
 	dc:description "Unexpected open tag at end of body" ;
 	rdfa:context "http://rdfa.info/test-suite/test-cases/rdfa1.1/html5-invalid/0295.html" .
-_:c14n4 a rdfa:Warning ;
+_:c14n14 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'earl' redefined via @xmlns" .
+_:c14n15 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'owl' redefined via @prefix" .
+_:c14n16 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'xhv' redefined via @prefix" .
+_:c14n17 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `class/Person`" .
+_:c14n18 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'cc' redefined via @prefix" .
+_:c14n19 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'ex' redefined via @prefix" .
+_:c14n2 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `previous`" .
+_:c14n20 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `top`" .
+_:c14n21 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `pred/name`" .
+_:c14n22 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `index`" .
+_:c14n23 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `index`" .
+_:c14n24 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `index`" .
+_:c14n25 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `meta`" .
+_:c14n26 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `meta`" .
+_:c14n27 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `meta`" .
+_:c14n28 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `section`" .
+_:c14n29 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `section`" .
+_:c14n3 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'ical' redefined via @prefix" .
+_:c14n30 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `section`" .
+_:c14n31 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `next`" .
+_:c14n32 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `next`" .
+_:c14n33 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `next`" .
+_:c14n34 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `next`" .
+_:c14n35 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `alternate`" .
+_:c14n36 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `alternate`" .
+_:c14n37 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `alternate`" .
+_:c14n38 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `alternate`" .
+_:c14n39 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `help`" .
+_:c14n4 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `pred/lang`" .
+_:c14n40 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `help`" .
+_:c14n41 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `help`" .
+_:c14n42 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `subsection`" .
+_:c14n43 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `subsection`" .
+_:c14n44 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `subsection`" .
+_:c14n45 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @xmlns" .
+_:c14n46 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @xmlns" .
+_:c14n47 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @xmlns" .
+_:c14n48 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `first`" .
+_:c14n49 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `first`" .
+_:c14n5 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'rdf' redefined via @prefix" .
+_:c14n50 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `p3pv1`" .
+_:c14n51 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `p3pv1`" .
+_:c14n52 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `p3pv1`" .
+_:c14n53 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `glossary`" .
+_:c14n54 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `glossary`" .
+_:c14n55 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `glossary`" .
+_:c14n56 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `bookmark`" .
+_:c14n57 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `bookmark`" .
+_:c14n58 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `bookmark`" .
+_:c14n59 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `stylesheet`" .
+_:c14n6 a rdfa:DocumentError ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Unexpected open element" ;
+	rdfa:context "http://rdfa.info/test-suite/test-cases/rdfa1.1/html5-invalid/0295.html" .
+_:c14n60 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `stylesheet`" .
+_:c14n61 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `stylesheet`" .
+_:c14n62 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `up`" .
+_:c14n63 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `up`" .
+_:c14n64 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `up`" .
+_:c14n65 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `up`" .
+_:c14n66 a rdfa:Warning ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
 	dc:description "Invalid IRI: <> (No scheme found in an absolute IRI)" .
-_:c14n5 a rdfa:Warning ;
+_:c14n67 a rdfa:Warning ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
 	dc:description "Invalid IRI: <> (No scheme found in an absolute IRI)" .
-_:c14n6 a rdfa:Warning ;
+_:c14n68 a rdfa:Warning ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
 	dc:description "Invalid IRI: <> (No scheme found in an absolute IRI)" .
-_:c14n7 a rdfa:Warning ;
+_:c14n69 a rdfa:Warning ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
 	dc:description "Invalid IRI: <> (No scheme found in an absolute IRI)" .
-_:c14n8 a rdfa:DocumentError ;
+_:c14n7 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'v' redefined via @prefix" .
+_:c14n70 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `cite`" .
+_:c14n71 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `cite`" .
+_:c14n72 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `cite`" .
+_:c14n73 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `appendix`" .
+_:c14n74 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `appendix`" .
+_:c14n75 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `appendix`" .
+_:c14n76 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `contents`" .
+_:c14n77 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `contents`" .
+_:c14n78 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `contents`" .
+_:c14n79 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `chapter`" .
+_:c14n8 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'rdfs' redefined via @prefix" .
+_:c14n80 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `chapter`" .
+_:c14n81 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `chapter`" .
+_:c14n82 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'dc' redefined via @prefix" .
+_:c14n83 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'dc' redefined via @prefix" .
+_:c14n84 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'dc' redefined via @prefix" .
+_:c14n85 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'dc' redefined via @prefix" .
+_:c14n86 a rdfa:DocumentError ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
 	dc:description "Unacknowledged self-closing tag" ;
 	rdfa:context "http://rdfa.info/test-suite/test-cases/rdfa1.1/html5-invalid/0295.html" .
-_:c14n9 a rdfa:DocumentError ;
+_:c14n87 a rdfa:DocumentError ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
 	dc:description "Unacknowledged self-closing tag" ;
 	rdfa:context "http://rdfa.info/test-suite/test-cases/rdfa1.1/html5-invalid/0295.html" .
+_:c14n88 a rdfa:DocumentError ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Unacknowledged self-closing tag" ;
+	rdfa:context "http://rdfa.info/test-suite/test-cases/rdfa1.1/html5-invalid/0295.html" .
+_:c14n89 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n9 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "ignoring attempt to add prefix assignment via @prefix for reserved prefix '_'" .
+_:c14n90 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n91 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n92 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n93 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n94 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n95 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n96 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n97 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .
+_:c14n98 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `prev`" .
+_:c14n99 a rdfa:UnresolvedTerm ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "Invalid term: `prev`" .

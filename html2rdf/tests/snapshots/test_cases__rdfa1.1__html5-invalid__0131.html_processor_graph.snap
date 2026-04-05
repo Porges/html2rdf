@@ -11,3 +11,6 @@ _:c14n0 a rdfa:DocumentError ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
 	dc:description "Invalid numeric character reference" ;
 	rdfa:context "http://rdfa.info/test-suite/test-cases/rdfa1.1/html5-invalid/0131.html" .
+_:c14n1 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'xhv' redefined via @prefix" .

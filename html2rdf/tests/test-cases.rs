@@ -11,8 +11,6 @@ pub fn ttl_equality(
     #[files("rdfa1.1*/xhtml5-invalid/*.*html")]
     #[files("rdfa1.1*/html5/*.*html")]
     #[files("rdfa1.1*/html5-invalid/*.*html")]
-    // - 0313, 0235-0239 are processor-graph tests
-    #[exclude("0313|023[5-9]")]
     // I believe this test is simply wrong
     #[exclude("0319")]
     // these requires c14n and the test suite version is wrong
@@ -48,6 +46,12 @@ pub fn ttl_equality(
         .unwrap_or_default()
         .contains("vocab_expansion=true");
 
+    let target_processor_graph = manifest_entry
+        .query_param
+        .as_deref()
+        .unwrap_or_default()
+        .contains("rdfagraph=processor");
+
     let (output_graph, processor_graph) = utils::parse_html_base(
         &input,
         base.as_ref(),
@@ -61,21 +65,24 @@ pub fn ttl_equality(
         .unwrap()
         .replace("\r\n", "\n");
 
-    let result = utils::ask(&output_graph, &sparql);
+    let target_graph = if target_processor_graph {
+        &processor_graph
+    } else {
+        &output_graph
+    };
+    let result = utils::ask(target_graph, &sparql);
     let expected = manifest_entry.expected_results;
     assert_eq!(
         result,
         expected,
         "SPARQL ASK returned {result}, expected {expected}\n\nSPARQL:\n{sparql}\n\nHTML:\n{input}\n\nGraph:\n{}",
-        utils::serialize_normalized_graph(output_graph, base.as_str()),
+        utils::serialize_graph(target_graph, base.as_str()),
     );
 
-    if !processor_graph.is_empty() {
-        insta::assert_snapshot!(
-            format!("{relpath}_processor_graph"),
-            utils::serialize_normalized_graph(processor_graph, base.as_str(),)
-        );
-    }
+    insta::assert_snapshot!(
+        format!("{relpath}_processor_graph"),
+        utils::serialize_normalized_graph(processor_graph, base.as_str(),)
+    );
 }
 
 #[derive(serde::Deserialize)]

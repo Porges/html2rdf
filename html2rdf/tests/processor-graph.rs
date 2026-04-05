@@ -19,7 +19,7 @@ fn invalid_blank_node_suffix_emits_warning() {
     @prefix xsd: <//www.w3.org/2001/XMLSchema#> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
     @prefix dc: <//purl.org/dc/terms/> .
-    _:c14n0 a rdfa:UnresolvedCurie ;
+    _:c14n0 a rdfa:UnresolvedCURIE ;
     	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
     	dc:description "Invalid CURIE: [_:invalid blank] (invalid blank node suffix `invalid blank`)" .
     "#);
@@ -42,7 +42,7 @@ fn undefined_prefix_in_safe_curie_emits_warning() {
     @prefix xsd: <//www.w3.org/2001/XMLSchema#> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
     @prefix dc: <//purl.org/dc/terms/> .
-    _:c14n0 a rdfa:UnresolvedCurie ;
+    _:c14n0 a rdfa:UnresolvedCURIE ;
     	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
     	dc:description "Invalid CURIE: [undefined:thing] (no such prefix defined)" .
     "#);
@@ -65,7 +65,7 @@ fn invalid_iri_from_curie_expansion_emits_warning() {
     @prefix xsd: <//www.w3.org/2001/XMLSchema#> .
     @prefix rdfa: <//www.w3.org/ns/rdfa#> .
     @prefix dc: <//purl.org/dc/terms/> .
-    _:c14n0 a rdfa:UnresolvedCurie ;
+    _:c14n0 a rdfa:UnresolvedCURIE ;
     	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
     	dc:description "Expanding CURIE [bad:thing] resulted in an invalid IRI (Invalid IRI: <http://example.test/invalid{iri}/thing>; Invalid IRI code point '{')" .
     "#);

@@ -102,12 +102,20 @@ impl ProcessorGraphError for CurieOrIriError {
 impl ProcessorGraphError for TermOrIriError {
     fn message_class(&self) -> Option<PGClass> {
         match self {
-            TermOrIriError::Term(_) => None,
+            TermOrIriError::Term(err) => err.message_class(),
             TermOrIriError::Iri(err) => err.message_class(),
         }
     }
 }
 
 #[derive(derive_more::Error, derive_more::Display, Debug)]
-#[display("Invalid term")]
-pub struct InvalidTerm;
+#[display("Invalid term: `{term}`")]
+pub struct InvalidTerm {
+    pub term: String,
+}
+
+impl ProcessorGraphError for InvalidTerm {
+    fn message_class(&self) -> Option<PGClass> {
+        Some(PGClass::UnresolvedTerm)
+    }
+}

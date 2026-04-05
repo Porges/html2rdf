@@ -1,13 +1,33 @@
 ---
 source: html2rdf/tests/test-cases.rs
-expression: "utils::serialize_graph(processor_graph, base.as_str(),)"
+expression: "utils::serialize_normalized_graph(processor_graph, base.as_str(),)"
 ---
 @base <http://rdfa.info/test-suite/test-cases/rdfa1.1/xhtml5/0216.xhtml> .
 @prefix rdf: <//www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix xsd: <//www.w3.org/2001/XMLSchema#> .
 @prefix rdfa: <//www.w3.org/ns/rdfa#> .
 @prefix dc: <//purl.org/dc/terms/> .
-_:c14n0 a rdfa:DocumentError ;
+_:c14n0 a rdfa:PrefixRedefinition ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
-	dc:description "Saw ? in state TagOpen" ;
-	rdfa:context "http://rdfa.info/test-suite/test-cases/rdfa1.1/xhtml5/0216.xhtml" .
+	dc:description "prefix 'ical' redefined via @prefix" .
+_:c14n1 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'rdf' redefined via @prefix" .
+_:c14n2 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'rdfs' redefined via @prefix" .
+_:c14n3 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'sioc' redefined via @prefix" .
+_:c14n4 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'xsd' redefined via @prefix" .
+_:c14n5 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'owl' redefined via @prefix" .
+_:c14n6 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'dc' redefined via @prefix" .
+_:c14n7 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'foaf' redefined via @prefix" .

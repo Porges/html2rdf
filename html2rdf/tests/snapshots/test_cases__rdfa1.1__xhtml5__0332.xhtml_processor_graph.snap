@@ -7,6 +7,9 @@ expression: "utils::serialize_normalized_graph(processor_graph, base.as_str(),)"
 @prefix xsd: <//www.w3.org/2001/XMLSchema#> .
 @prefix rdfa: <//www.w3.org/ns/rdfa#> .
 @prefix dc: <//purl.org/dc/terms/> .
-_:c14n0 a rdfa:Warning ;
+_:c14n0 a rdfa:PrefixRedefinition ;
+	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
+	dc:description "prefix 'dcterms' redefined via @prefix" .
+_:c14n1 a rdfa:Warning ;
 	dc:date "2020-01-13T12:02:00Z"^^xsd:dateTime ;
 	dc:description "Invalid IRI: <> (No scheme found in an absolute IRI)" .

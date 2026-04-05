@@ -48,7 +48,7 @@ pub mod rdfa {
         oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#VocabReferenceError");
 
     pub static UNRESOLVED_CURIE: oxrdf::NamedNodeRef =
-        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#UnresolvedCurie");
+        oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#UnresolvedCURIE");
 
     pub static UNRESOLVED_TERM: oxrdf::NamedNodeRef =
         oxrdf::NamedNodeRef::new_unchecked("http://www.w3.org/ns/rdfa#UnresolvedTerm");
