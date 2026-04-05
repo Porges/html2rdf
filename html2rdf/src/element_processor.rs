@@ -239,11 +239,12 @@ impl<'e, 'ec, 'r, 'pg, E: Element, PG: ProcessorGraph> ElementProcessor<'e, 'ec,
 
         // TODO: this is not correct for non-HTML implementations
         ctx.is_root_element = ctx.element.tag_name() == "html";
-        //debug_assert_eq!(ctx.is_root_element, eval_context.parent_object.is_none(),);
 
         ctx.datatype = ctx.attr_1_term_or_curie_or_absiri("datatype");
         ctx.in_list = ctx.attr_raw("inlist").is_some();
-        ctx.has_content = ctx.attr_raw("content").is_some();
+        ctx.has_content = ctx.attr_raw("content").is_some()
+            || ctx.attr_raw("datetime").is_some()
+            || ctx.element.tag_name() == "time";
 
         ctx
     }
@@ -413,6 +414,7 @@ impl<'e, 'ec, 'r, 'pg, E: Element, PG: ProcessorGraph> ElementProcessor<'e, 'ec,
         } else if self.is_root_element {
             Self::type_resource(&mut type_of, self.ctx.subject_ref(), "root element", output);
         }
+
         self.subject_established(output);
 
         if let Some(resource) = self.get_resource() {
