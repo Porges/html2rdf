@@ -7,14 +7,13 @@ authors = ["George Pollard <porges@porg.es>"]
 edition = "2024"
 keywords = ["html", "rdf", "rdfa"]
 license = "Apache-2.0"
-publish = false
 readme = "README.md"
 repository = "https://github.com/Porges/html2rdf"
 rust-version = "1.88.0"
 
 [workspace.dependencies]
-html2rdf = { path = "html2rdf" }
-jiff = "^0.2.23"
+html2rdf = { path = "html2rdf", version = "0.2" }
+jiff = "0.2.23"
 librdfa-wrapper = { path = "librdfa-wrapper" }
 oxiri = "0.2.11"
 oxrdf = "0.3.3"

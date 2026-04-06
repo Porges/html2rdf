@@ -5,10 +5,10 @@ authors.workspace = true
 edition.workspace = true
 keywords.workspace = true
 license.workspace = true
-publish.workspace = true
 readme.workspace = true
 repository.workspace = true
-
+publish = true
+description = "A command-line tool to extract RDF from (X)HTML documents."
 
 [[bin]]
 name = "html2rdf"

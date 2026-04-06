@@ -1,3 +1,5 @@
+//! Implements RDFa processing.
+
 use std::{cell::RefCell, rc::Rc};
 
 use itertools::Itertools;

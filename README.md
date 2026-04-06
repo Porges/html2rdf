@@ -20,5 +20,7 @@ Currently, html2rdf supports (nearly all of?) RDFa 1.1. RDFa 1.0 is not supporte
 
 Known missing features are:
 - XMLLiteral output in HTML5 host language is not canonicalized at all
+- `xml:base` attributes are not processed at all
 
-Eventually, html2rdf will also implement Microdata and JSON-LD, but this has not been started at all.
+Eventually, html2rdf will also implement Microdata (and Microdata-to-RDF conversion)
+and JSON-LD, but this has not been started at all.

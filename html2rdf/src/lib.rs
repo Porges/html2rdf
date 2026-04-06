@@ -6,9 +6,7 @@
 //! It supports full [RDFa Core 1.1][rdfa-core], as well as
 //! [XHTML+RDFa 1.1][xhtml-rdfa] and [HTML+RDFa 1.1][html-rdfa].
 //!
-//! Core functionality is well-tested but there might be some edge-cases
-//! which are not yet properly handled, especialyl in the X/HTML-specific
-//! extensions.
+//! RDFa 1.0 and HTML4 are not supported.
 //!
 //! [rdfa-core]: https://www.w3.org/TR/rdfa-core/
 //! [xhtml-rdfa]: https://www.w3.org/TR/xhtml-rdfa/
@@ -18,10 +16,12 @@
 //! The following features are available, all enabled by default:
 //! - `html`: enables HTML5 processing (via `scraper`)
 //! - `xhtml`: enables XHTML processing (via `uppsala`)
-//! - `vocab-online`: enables the use of [`algorithms::OnlineVocabularyProcessor`] (this also enables `html`)
+//! - `vocab-online`: enables the use of [`OnlineVocabularyProcessor`](crate::rdfa::algorithms::OnlineVocabularyResolver)
+//!   (this also implies `html`)
 //!
 //! ## Known Issues
 //! - `XMLLiteral` values are not yet correctly canonicalized in HTML5
+//! - `xml:base` attributes are not processed
 
 use oxiri::Iri;
 use oxrdf::Graph;
@@ -62,7 +62,7 @@ impl<H> Options<H> {
 
     /// Enables the RDFA vocabulary expansion feature.
     ///
-    /// Note that if using [`OnlineVocabularyResolver`],
+    /// Note that if using [`OnlineVocabularyResolver`](crate::rdfa::algorithms::OnlineVocabularyResolver),
     /// this may reach out to untrusted HTTP(S) endpoints.
     #[must_use]
     pub fn enable_vocabulary_expansion(
