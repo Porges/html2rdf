@@ -10,10 +10,9 @@ use oxrdf::{
 use tracing::trace;
 
 use crate::{
-    EvaluationContext,
     graphs::{OutputGraph, ProcessorGraph},
     host_language::Element,
-    lists::SharedList,
+    rdfa::{EvaluationContext, lists::SharedList},
 };
 
 /// A type to represent attribute lookups.
@@ -91,7 +90,7 @@ pub(crate) enum IncompleteTriple {
     },
 }
 
-pub struct ElementProcessor<'e, 'ec, 'r, 'pg, E, PG> {
+pub(crate) struct ElementProcessor<'e, 'ec, 'r, 'pg, E, PG> {
     ctx: &'ec mut Rc<EvaluationContext<'r>>,
     element: &'e E,
     processor_graph: &'pg mut PG,
@@ -222,7 +221,7 @@ const HTML_LITERAL: NamedNodeRef =
 
 // Construction and RDFa processing steps
 impl<'e, 'ec, 'r, 'pg, E: Element, PG: ProcessorGraph> ElementProcessor<'e, 'ec, 'r, 'pg, E, PG> {
-    pub fn new(
+    pub(crate) fn new(
         eval_context: &'ec mut Rc<EvaluationContext<'r>>,
         element: &'e E,
         processor_graph: &'pg mut PG,

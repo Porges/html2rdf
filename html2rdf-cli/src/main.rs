@@ -1,7 +1,7 @@
 use std::{io::Write, process::ExitCode};
 
 use clap::Parser;
-use html2rdf::{Options, algorithms::OnlineVocabularyResolver, host_language::Html5};
+use html2rdf::{Options, host_language::Html5, rdfa::algorithms::OnlineVocabularyResolver};
 use oxrdf::{
     Graph,
     graph::{CanonicalizationAlgorithm, CanonicalizationHashAlgorithm},
@@ -103,10 +103,12 @@ async fn main() -> Result<ExitCode, Box<dyn std::error::Error>> {
 
     {
         // use serializer with all known prefixes
-        let serializer = html2rdf::initial_context::prefixes().mappings().try_fold(
-            oxttl::TurtleSerializer::new().with_base_iri(base.as_str())?,
-            |serializer, (prefix, value)| serializer.with_prefix(prefix, value),
-        )?;
+        let serializer = html2rdf::rdfa::initial_context::prefixes()
+            .mappings()
+            .try_fold(
+                oxttl::TurtleSerializer::new().with_base_iri(base.as_str())?,
+                |serializer, (prefix, value)| serializer.with_prefix(prefix, value),
+            )?;
 
         if args.canonicalize {
             output_graph.canonicalize(CanonicalizationAlgorithm::Rdfc10 {

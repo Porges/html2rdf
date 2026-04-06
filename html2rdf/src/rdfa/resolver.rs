@@ -9,9 +9,8 @@ use oxrdf::{BlankNode, NamedNode, NamedNodeRef, NamedOrBlankNode};
 use tracing::trace;
 
 use crate::{
-    OutputGraph,
     errors::{CurieError, CurieOrIriError, InvalidTerm, IriError, TermOrIriError},
-    graphs::{PGClass, ProcessorGraph},
+    graphs::{OutputGraph, PGClass, ProcessorGraph},
     host_language::HostLanguage,
     vocab::rdfa,
 };

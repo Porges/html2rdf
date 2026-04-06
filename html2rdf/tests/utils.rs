@@ -4,9 +4,9 @@ use std::{collections::HashSet, str::FromStr, sync::OnceLock};
 
 use html2rdf::{
     Options,
-    algorithms::OfflineVocabularyResolver,
     graphs::{self, ProcessorGraph},
     host_language::{Html5, XHtml},
+    rdfa::algorithms::OfflineVocabularyResolver,
 };
 use itertools::Itertools;
 use oxrdf::{
@@ -127,7 +127,7 @@ pub fn serialize_graph(graph: &Graph, base: &str) -> String {
     // slow but makes test output nicer
     let mut prefixes_to_use = HashSet::new();
     let mut add_prefix = |full_iri: &str| {
-        if let Some((known_prefix, iri)) = html2rdf::initial_context::prefixes()
+        if let Some((known_prefix, iri)) = html2rdf::rdfa::initial_context::prefixes()
             .mappings()
             .find(|(prefix, iri)| !prefix.is_empty() && full_iri.starts_with(*iri))
         {

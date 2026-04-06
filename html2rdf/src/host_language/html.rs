@@ -46,11 +46,11 @@ impl super::HostLanguage for Html5 {
     type ParseError = Infallible;
 
     fn initial_terms(&self) -> &'static std::collections::BTreeMap<String, oxrdf::NamedNode> {
-        crate::initial_context::terms()
+        crate::rdfa::initial_context::terms()
     }
 
     fn initial_prefixes(&self) -> &'static curie::PrefixMapping {
-        crate::initial_context::prefixes()
+        crate::rdfa::initial_context::prefixes()
     }
 
     // “The default vocabulary URI is undefined.

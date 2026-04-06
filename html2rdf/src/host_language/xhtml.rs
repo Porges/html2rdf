@@ -67,7 +67,7 @@ impl HostLanguage for XHtml {
         static INITIAL_TERMS: OnceLock<std::collections::BTreeMap<String, NamedNode>> =
             OnceLock::new();
         INITIAL_TERMS.get_or_init(|| {
-            let mut terms = crate::initial_context::terms().clone();
+            let mut terms = crate::rdfa::initial_context::terms().clone();
             for t in [
                 "alternate",
                 "appendix",
@@ -110,7 +110,7 @@ impl HostLanguage for XHtml {
     }
 
     fn initial_prefixes(&self) -> &'static curie::PrefixMapping {
-        crate::initial_context::prefixes()
+        crate::rdfa::initial_context::prefixes()
     }
 }
 

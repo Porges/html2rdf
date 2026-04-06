@@ -3,7 +3,7 @@
 //! [html-rdfa] §3.5: Property Copying
 //! [html-rdfa] §3.5.1: Implementing Property Copying
 
-use html2rdf::algorithms::property_copying;
+use html2rdf::rdfa::algorithms::property_copying;
 
 mod utils;
 use utils::ttl_to_graph;
